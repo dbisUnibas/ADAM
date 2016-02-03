@@ -3871,7 +3871,7 @@ recheck_cast_function_args(List *args, Oid result_type, HeapTuple func_tuple)
 		elog(ERROR, "function's resolved result type changed during planning");
 
 	/* perform any necessary typecasting of arguments */
-	make_fn_arguments(NULL, args, actual_arg_types, declared_arg_types);
+	make_fn_arguments(NULL, args, actual_arg_types, declared_arg_types, NULL);
 }
 
 /*

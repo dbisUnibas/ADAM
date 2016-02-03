@@ -604,12 +604,16 @@ create_join_plan(PlannerInfo *root, JoinPath *best_path)
 	Plan	   *plan;
 	Relids		saveOuterRels = root->curOuterRels;
 
+	best_path->outerjoinpath->adamPathClause = best_path->path.adamPathClause;
+
 	outer_plan = create_plan_recurse(root, best_path->outerjoinpath);
 
 	/* For a nestloop, include outer relids in curOuterRels for inner side */
 	if (best_path->path.pathtype == T_NestLoop)
 		root->curOuterRels = bms_union(root->curOuterRels,
 								   best_path->outerjoinpath->parent->relids);
+	
+	best_path->innerjoinpath->adamPathClause = best_path->path.adamPathClause;
 
 	inner_plan = create_plan_recurse(root, best_path->innerjoinpath);
 
@@ -859,6 +863,8 @@ create_material_plan(PlannerInfo *root, MaterialPath *best_path)
 {
 	Material   *plan;
 	Plan	   *subplan;
+
+	best_path->subpath->adamPathClause = best_path->path.adamPathClause;
 
 	subplan = create_plan_recurse(root, best_path->subpath);
 
@@ -1308,6 +1314,7 @@ create_bitmap_scan_plan(PlannerInfo *root,
 	bitmapqualplan = create_bitmap_subplan(root, best_path->bitmapqual,
 										   &bitmapqualorig, &indexquals,
 										   &indexECs);
+	bitmapqualplan->adamPlanClause = best_path->path.adamPathClause;
 
 	/*
 	 * The qpqual list must contain all restrictions not automatically handled
@@ -1391,6 +1398,7 @@ create_bitmap_scan_plan(PlannerInfo *root,
 									 bitmapqualorig,
 									 baserelid);
 
+	((Plan *) scan_plan)->adamPlanClause = best_path->path.adamPathClause;
 	copy_path_costsize(&scan_plan->scan.plan, &best_path->path);
 
 	return scan_plan;

@@ -239,12 +239,39 @@ create_index_paths(PlannerInfo *root, RelOptInfo *rel)
 	IndexClauseSet eclauseset;
 	ListCell   *lc;
 
+	int			  rclausectr = 0;
+
 	/* Skip the whole mess if no indexes */
 	if (rel->indexlist == NIL)
 		return;
 
 	/* Bitmap paths are collected and then dealt with at the end */
 	bitindexpaths = bitjoinpaths = joinorclauses = NIL;
+
+
+	/* do VA index check */
+	foreach(lc, rel->indexlist)
+	{
+		IndexOptInfo *index = (IndexOptInfo *) lfirst(lc);
+		MemSet(&rclauseset, 0, sizeof(rclauseset));
+		match_restriction_clauses_to_index(rel, index, &rclauseset);
+
+		//here we count how many other indices are available (for the given search, i.e. that would
+		//be able to answer the clause) that are not of type VA index
+		//see code below
+		if(rclauseset.nonempty){
+			int i = 0;
+
+			for(i = 0; i < INDEX_MAX_KEYS; i++){
+				if(rclauseset.indexclauses[i] && index->relam != VA_AM_OID){
+					rclausectr++;
+				} else {
+					break;
+				}
+			}
+		}
+	}
+
 
 	/* Examine each index in turn */
 	foreach(lc, rel->indexlist)
@@ -261,6 +288,22 @@ create_index_paths(PlannerInfo *root, RelOptInfo *rel)
 		 */
 		if (index->indpred != NIL && !index->predOK)
 			continue;
+
+		//after having counter how many indices we can also use for the query
+		//here we jump over all the VA indices (i.e. we do not allow to use them
+		//for the query) if there are not enough other indices that help us
+		//to answer the query
+		//we calculate -1, since the single VA index that we use removes 1 of the
+		//restrict infos
+		//we only subtract 1 and not #of VA indices!!! this is important to note
+		//because we can have multiple indices with a different Minkowski parameter
+		//however, the decision whether to use the index or not is (hacked) made
+		//using the cost estimate and not yet here; so at this moment we have
+		//to consider all the VA indices as being just 1
+		if(index->relam == VA_AM_OID && rel->baserestrictinfo
+			&& list_length(rel->baserestrictinfo) - 1 != rclausectr){
+			continue;
+		}
 
 		/*
 		 * Identify the restriction clauses that can match the index.

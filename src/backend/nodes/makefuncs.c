@@ -508,3 +508,92 @@ makeDefElemExtended(char *nameSpace, char *name, Node *arg,
 
 	return res;
 }
+
+
+
+Node *
+makeStringAConst(char *str)
+{
+	A_Const *n = makeNode(A_Const);
+
+	n->val.type = T_String;
+	n->val.val.str = str;
+	n->location = -1;
+
+	return (Node *)n;
+}
+
+
+Node *
+makeIntAConst(int val)
+{
+	A_Const *n = makeNode(A_Const);
+
+	n->val.type = T_Integer;
+	n->val.val.ival = val;
+	n->location = -1;
+
+	return (Node *)n;
+}
+
+Node *
+makeFloatAConst(char *str)
+{
+	A_Const *n = makeNode(A_Const);
+
+	n->val.type = T_Float;
+	n->val.val.str = str;
+	n->location = -1;
+
+	return (Node *)n;
+}
+
+Node *
+makeFloatAConstFloat(float4 val)
+{
+	A_Const *n = makeNode(A_Const);
+	char * str = palloc(255);
+
+	sprintf(str, "%f", val);
+
+	n->val.type = T_Float;
+	n->val.val.str = str;
+	n->location = -1;
+
+	return (Node *)n;
+}
+
+Node *
+makeBitStringAConst(char *str)
+{
+	A_Const *n = makeNode(A_Const);
+
+	n->val.type = T_BitString;
+	n->val.val.str = str;
+	n->location = -1;
+
+	return (Node *)n;
+}
+
+Node *
+makeBooleanAConst(bool state)
+{
+	A_Const *n = makeNode(A_Const);
+
+	n->val.type = T_String;
+	n->val.val.str = (state ? "t" : "f");
+	n->location = -1;
+
+	return (Node *) n;
+}
+
+Node *
+makeNullValAConst()
+{
+	A_Const *n = makeNode(A_Const);
+
+	n->val.type = T_Null;
+	n->location = -1;
+
+	return (Node *)n;
+}

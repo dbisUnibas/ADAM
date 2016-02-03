@@ -132,5 +132,9 @@ DESCR("GIN index access method");
 DATA(insert OID = 4000 (  spgist	0 5 f f f f f t f t f f f 0 spginsert spgbeginscan spggettuple spggetbitmap spgrescan spgendscan spgmarkpos spgrestrpos spgbuild spgbuildempty spgbulkdelete spgvacuumcleanup spgcanreturn spgcostestimate spgoptions ));
 DESCR("SP-GiST index access method");
 #define SPGIST_AM_OID 4000
+DATA(insert OID = 5900 (  va		1 1 f t f f t t f f f f f 2281 vaInsert vaBeginScan - vaGetBitmap vaReScan vaEndScan vaMarkPos vaRestorePos vaBuild vaBuildEmpty vaBulkDelete vaVacuumCleanup vaCanReturn vaCostEstimate vaGetOptions ));
+DESCR("bloom filter access method");
+#define VA_AM_OID 5900
+
 
 #endif   /* PG_AM_H */

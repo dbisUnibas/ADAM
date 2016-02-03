@@ -15,6 +15,8 @@
 
 #include "postgres.h"
 
+#include "utils/adam_retrieval.h"
+
 #include "access/htup_details.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
@@ -734,24 +736,29 @@ op_error(ParseState *pstate, List *op, char oprkind,
  */
 Expr *
 make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
-		int location)
+		List *mods, int location)
 {
 	Oid			ltypeId,
 				rtypeId;
+	int32		ltypemod, rtypemod;
 	Operator	tup;
 	Form_pg_operator opform;
 	Oid			actual_arg_types[2];
 	Oid			declared_arg_types[2];
+	int32		typmods[2];
 	int			nargs;
 	List	   *args;
 	Oid			rettype;
-	OpExpr	   *result;
+	Expr	   *result;
+	Oid			oproid;
+	OpExpr		*opResult;
 
 	/* Select the operator */
 	if (rtree == NULL)
 	{
 		/* right operator */
 		ltypeId = exprType(ltree);
+		ltypemod = exprTypmod(ltree);
 		rtypeId = InvalidOid;
 		tup = right_oper(pstate, opname, ltypeId, false, location);
 	}
@@ -759,6 +766,7 @@ make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
 	{
 		/* left operator */
 		rtypeId = exprType(rtree);
+		rtypemod = exprTypmod(rtree);
 		ltypeId = InvalidOid;
 		tup = left_oper(pstate, opname, rtypeId, false, location);
 	}
@@ -766,7 +774,9 @@ make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
 	{
 		/* otherwise, binary operator */
 		ltypeId = exprType(ltree);
+		ltypemod = exprTypmod(ltree);
 		rtypeId = exprType(rtree);
+		rtypemod = exprTypmod(rtree);
 		tup = oper(pstate, opname, ltypeId, rtypeId, false, location);
 	}
 
@@ -790,6 +800,7 @@ make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
 		args = list_make1(ltree);
 		actual_arg_types[0] = ltypeId;
 		declared_arg_types[0] = opform->oprleft;
+		typmods[0] = ltypemod;
 		nargs = 1;
 	}
 	else if (ltree == NULL)
@@ -798,6 +809,7 @@ make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
 		args = list_make1(rtree);
 		actual_arg_types[0] = rtypeId;
 		declared_arg_types[0] = opform->oprright;
+		typmods[0] = rtypemod;
 		nargs = 1;
 	}
 	else
@@ -808,6 +820,8 @@ make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
 		actual_arg_types[1] = rtypeId;
 		declared_arg_types[0] = opform->oprleft;
 		declared_arg_types[1] = opform->oprright;
+		typmods[0] = ltypemod;
+		typmods[1] = rtypemod;
 		nargs = 2;
 	}
 
@@ -822,22 +836,35 @@ make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
 											   opform->oprresult,
 											   false);
 
+	/* typ coercion */
+	if(ltypeId == FEATURE && rtypeId != FEATURE){
+		typmods[1] = ltypemod;
+	} else if(ltypeId != FEATURE && rtypeId == FEATURE){
+		typmods[0] = rtypemod;
+	}
+
 	/* perform the necessary typecasting of arguments */
-	make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
+	make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types, typmods);
+
+	oproid = oprid(tup);
+	ReleaseSysCache(tup);
+	
 
 	/* and build the expression node */
-	result = makeNode(OpExpr);
-	result->opno = oprid(tup);
-	result->opfuncid = opform->oprcode;
-	result->opresulttype = rettype;
-	result->opretset = get_func_retset(opform->oprcode);
+	opResult = makeNode(OpExpr);
+	opResult->opno = oproid;
+	opResult->opfuncid = opform->oprcode;
+	opResult->opresulttype = rettype;
+	opResult->opretset = get_func_retset(opform->oprcode);
 	/* opcollid and inputcollid will be set by parse_collate.c */
-	result->args = args;
-	result->location = location;
+	opResult->args = args;
+	opResult->location = location;
 
-	ReleaseSysCache(tup);
+	result = (Expr *) opResult;
+	
 
-	return (Expr *) result;
+
+	return result;
 }
 
 /*
@@ -953,7 +980,7 @@ make_scalar_array_op(ParseState *pstate, List *opname,
 	declared_arg_types[1] = res_atypeId;
 
 	/* perform the necessary typecasting of arguments */
-	make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
+	make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types, NULL);
 
 	/* and build the expression node */
 	result = makeNode(ScalarArrayOpExpr);

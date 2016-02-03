@@ -55,6 +55,7 @@ typedef struct Value
 
 extern Value *makeInteger(long i);
 extern Value *makeFloat(char *numericStr);
+extern Value *makeFloatFloat(float8 i);
 extern Value *makeString(char *str);
 extern Value *makeBitString(char *str);
 

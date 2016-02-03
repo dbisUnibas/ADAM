@@ -290,4 +290,11 @@ typedef FormData_pg_statistic *Form_pg_statistic;
  */
 #define STATISTIC_KIND_BOUNDS_HISTOGRAM  7
 
+/*
+ * Stores max distance, mean and stdv for normalization
+ */
+#define STATISTIC_KIND_ADAM_NORMALIZATION_MAX  8
+#define STATISTIC_KIND_ADAM_NORMALIZATION_MEAN  9
+#define STATISTIC_KIND_ADAM_NORMALIZATION_STDV  10
+
 #endif   /* PG_STATISTIC_H */

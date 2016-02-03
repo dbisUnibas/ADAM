@@ -436,6 +436,31 @@ static void compute_bucket(Numeric operand, Numeric bound1, Numeric bound2,
 
 /* ----------------------------------------------------------------------
  *
+ * Get const functions
+ *
+ * ----------------------------------------------------------------------
+ */
+Numeric 
+	get_const_zero()
+{
+	return make_result(&const_zero);
+}
+
+Numeric 
+	get_const_one()
+{
+	return make_result(&const_one);
+}
+
+Numeric 
+	get_const_nan()
+{
+	return make_result(&const_nan);
+}
+
+
+/* ----------------------------------------------------------------------
+ *
  * Input-, output- and rounding-functions
  *
  * ----------------------------------------------------------------------
@@ -6169,4 +6194,122 @@ strip_var(NumericVar *var)
 
 	var->digits = digits;
 	var->ndigits = ndigits;
+}
+
+/* ADAM */
+/*
+* defines the sugeno complement for a numeric value, 
+* it is defined as
+*
+*             1 - v
+* c(v) = -------------
+*            1 + l*v
+*
+* where l is a free parameter
+*/
+Datum
+	numeric_sugeno(PG_FUNCTION_ARGS)
+{
+	Numeric		val_num = PG_GETARG_NUMERIC(0);		//value
+	Numeric		lambda_num = PG_GETARG_NUMERIC(1);	//parameter
+	NumericVar	val;
+	NumericVar	lambda;
+	NumericVar	result_minus;
+	NumericVar	result_multiplication;
+	NumericVar	result_add;
+	NumericVar	result;
+	Numeric		res;
+	int			rscale;
+
+	/*
+	 * handle NaN
+	 */
+	if (NUMERIC_IS_NAN(val_num) || NUMERIC_IS_NAN(lambda_num))
+		PG_RETURN_NUMERIC(make_result(&const_nan));
+
+	/*
+	 * unpacking arguments
+	 */
+	init_var_from_num(val_num, &val);
+	init_var_from_num(lambda_num, &lambda);
+
+	init_var(&result_minus);
+	init_var(&result_multiplication);
+	init_var(&result_add);
+	init_var(&result);
+
+	// calculation
+	sub_var(&const_one, &val, &result_minus); // 1 - v
+	mul_var(&lambda, &val, &result_multiplication, lambda.dscale + val.dscale); // lambda * v
+	add_var(&const_one, &result_multiplication, &result_add); // 1 + lambda * v
+
+	rscale = select_div_scale(&result_minus, &result_add);
+	div_var(&result_minus, &result_add, &result, rscale, false); // (1 - v) / (1 + lambda * v)
+
+	res = make_result(&result);
+
+	free_var(&result_minus);
+	free_var(&result_multiplication);
+	free_var(&result_add);
+	free_var(&result);
+
+	PG_RETURN_NUMERIC(res);
+}
+
+/*
+* defines the yager complement for a numeric value, 
+* it is defined as
+*
+* c(v) = (1 - v ^ w) ^ (1/w)
+*
+* where w is a free parameter
+*/
+Datum
+	numeric_yager(PG_FUNCTION_ARGS)
+{
+	Numeric		val_num = PG_GETARG_NUMERIC(0); //value
+	Numeric		w_num = PG_GETARG_NUMERIC(1);	//parameter
+	NumericVar	val;
+	NumericVar	w;
+	NumericVar	result_power;
+	NumericVar	result_minus;
+	NumericVar	result_division;
+	NumericVar	result;
+	Numeric		res;
+	int			rscale;
+
+	/*
+	 * Handle NaN
+	 */
+	if (NUMERIC_IS_NAN(val_num) || NUMERIC_IS_NAN(w_num))
+		PG_RETURN_NUMERIC(make_result(&const_nan));
+
+	/*
+	 * Unpack the arguments
+	 */
+	init_var_from_num(val_num, &val);
+	init_var_from_num(w_num, &w);
+
+	init_var(&result_power);
+	init_var(&result_minus);
+	init_var(&result_division);
+	init_var(&result);
+
+
+	power_var(&val, &w, &result_power); // v ^w
+	sub_var(&const_one, &result_power, &result_minus); // 1 - v^w
+
+	rscale = select_div_scale(&const_one, &w);
+	div_var(&const_one, &w, &result_division, rscale, true); // 1/w
+
+	power_var(&result_minus, &result_division, &result); // (1 - v^w)^(1/w)
+
+	res = make_result(&result);
+
+	free_var(&result_power);
+	free_var(&result_minus);
+	free_var(&result_division);
+	free_var(&result);
+
+	PG_RETURN_NUMERIC(res);
 }

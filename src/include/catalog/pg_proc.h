@@ -591,6 +591,7 @@ DESCR("less-equal-greater");
 DATA(insert OID = 3132 ( btfloat4sortsupport PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 2278 "2281" _null_ _null_ _null_ _null_ btfloat4sortsupport _null_ _null_ _null_ ));
 DESCR("sort support");
 DATA(insert OID = 355 (  btfloat8cmp	   PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 23 "701 701" _null_ _null_ _null_ _null_ btfloat8cmp _null_ _null_ _null_ ));
+#define BTFLOAT8CMPOID 355
 DESCR("less-equal-greater");
 DATA(insert OID = 3133 ( btfloat8sortsupport PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 2278 "2281" _null_ _null_ _null_ _null_ btfloat8sortsupport _null_ _null_ _null_ ));
 DESCR("sort support");
@@ -832,6 +833,7 @@ DATA(insert OID = 748 (  array_ndims	   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0
 DESCR("number of array dimensions");
 DATA(insert OID = 750 (  array_in		   PGNSP PGUID 12 1 0 0 0 f f f f t f s 3 0 2277 "2275 26 23" _null_ _null_ _null_ _null_	array_in _null_ _null_ _null_ ));
 DESCR("I/O");
+#define ARRAYINOID	750
 DATA(insert OID = 751 (  array_out		   PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 2275 "2277" _null_ _null_ _null_ _null_ array_out _null_ _null_ _null_ ));
 DESCR("I/O");
 DATA(insert OID = 2091 (  array_lower	   PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 23 "2277 23" _null_ _null_ _null_ _null_ array_lower _null_ _null_ _null_ ));
@@ -2265,6 +2267,7 @@ DESCR("smaller of two");
 DATA(insert OID = 1767 ( numeric_larger			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 1700 "1700 1700" _null_ _null_ _null_ _null_	numeric_larger _null_ _null_ _null_ ));
 DESCR("larger of two");
 DATA(insert OID = 1769 ( numeric_cmp			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 23 "1700 1700" _null_ _null_ _null_ _null_ numeric_cmp _null_ _null_ _null_ ));
+#define NUMERICCMPOID 1769
 DESCR("less-equal-greater");
 DATA(insert OID = 1771 ( numeric_uminus			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 1700 "1700" _null_ _null_ _null_ _null_ numeric_uminus _null_ _null_ _null_ ));
 DATA(insert OID = 1779 ( int8					PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 20 "1700" _null_ _null_ _null_ _null_ numeric_int8 _null_ _null_ _null_ ));
@@ -4721,10 +4724,174 @@ DESCR("SP-GiST support for quad tree over range");
 DATA(insert OID = 3473 (  spg_range_quad_leaf_consistent	PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "2281 2281" _null_ _null_ _null_ _null_  spg_range_quad_leaf_consistent _null_ _null_ _null_ ));
 DESCR("SP-GiST support for quad tree over range");
 
-
 /* event triggers */
 DATA(insert OID = 3566 (  pg_event_trigger_dropped_objects		PGNSP PGUID 12 10 100 0 0 f f f f t t s 0 0 2249 "" "{26,26,23,25,25,25,25}" "{o,o,o,o,o,o,o}" "{classid, objid, objsubid, object_type, schema_name, object_name, object_identity}" _null_ pg_event_trigger_dropped_objects _null_ _null_ _null_ ));
 DESCR("list objects dropped by the current command");
+
+
+/* ADAM */
+
+
+// feature
+// - input/output
+DATA(insert OID = 4918 (  feature_in PGNSP PGUID 12 1 0 0 0 f f f f t f i 3 0 4817 "2275 26 23" _null_ _null_ _null_ _null_	feature_in _null_ _null_ _null_ ));
+DESCR("I/O");
+DATA(insert OID = 4919 (  feature_out PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 2275 "4817" _null_ _null_ _null_ _null_	feature_out _null_ _null_ _null_ ));
+DESCR("I/O");
+// - casting
+DATA(insert OID = 4925 (  featureArrayCast	PGNSP PGUID 12 1 0 0 0 f f f f t f i 3 0 1231 "4817 23 16" _null_ _null_ _null_ _null_	featureArrayCast _null_ _null_ _null_ ));
+DESCR("feature to array cast");
+DATA(insert OID = 4926 (  arrayFeatureCast	PGNSP PGUID 12 1 0 0 0 f f f f t f i 3 0 4817 "1231 23 16" _null_ _null_ _null_ _null_	arrayFeatureCast _null_ _null_ _null_ ));
+DESCR("array to feature cast");
+// - operators
+DATA(insert OID = 4107 (  feature_eq PGNSP PGUID 12 1 0 0 0 f f f t t f i 2 0 16 "4817 4817" _null_ _null_ _null_ _null_ feature_eq _null_ _null_ _null_ ));
+DESCR("implementation of = operator");
+#define FEATURE_EQ_OID 4107
+DATA(insert OID = 4217 (  feature_dummy_eq PGNSP PGUID 12 1 0 0 0 f f f t t f i 2 0 16 "4817 4817" _null_ _null_ _null_ _null_ feature_dummy_eq _null_ _null_ _null_ ));
+DESCR("implementation of === operator");
+DATA(insert OID = 4108 (  feature_neq PGNSP PGUID 12 1 0 0 0 f f f t t f i 2 0 16 "4817 4817" _null_ _null_ _null_ _null_ feature_neq _null_ _null_ _null_ ));
+DESCR("implementation of <> operator");
+DATA(insert OID = 4110 (  feature_hash PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 23 "4817" _null_ _null_ _null_ _null_ feature_hash _null_ _null_ _null_ ));
+DESCR("hash");
+DATA(insert OID = 4129 (  feature_lt		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "4817 4817" _null_ _null_ _null_ _null_ feature_lt _null_ _null_ _null_ ));
+DESCR("implementation of < operator");
+DATA(insert OID = 4130 (  feature_gt		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "4817 4817" _null_ _null_ _null_ _null_ feature_gt _null_ _null_ _null_ ));
+DESCR("implementation of > operator");
+DATA(insert OID = 4131 (  feature_le		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "4817 4817" _null_ _null_ _null_ _null_ feature_le _null_ _null_ _null_ ));
+DESCR("implementation of <= operator");
+DATA(insert OID = 4132 (  feature_ge		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "4817 4817" _null_ _null_ _null_ _null_ feature_ge _null_ _null_ _null_ ));
+DESCR("implementation of >= operator");
+DATA(insert OID = 4133 (  feature_cmp		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 23 "4817 4817" _null_ _null_ _null_ _null_ feature_cmp _null_ _null_ _null_ ));
+DESCR("less-equal-greater");
+DATA(insert OID = 4115 (  dummyFeatureDistance PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "4817 4817" _null_ _null_ _null_ _null_ dummyFeatureDistance _null_ _null_ _null_ ));
+DESCR("implementation of <~> operator");
+DATA(insert OID = 4215 (  calculateMinkowski PGNSP PGUID 12 10000 0 0 0 f f f f t f i 3 0 701 "4817 4817 701" _null_ _null_ _null_ _null_ calculateMinkowski _null_ _null_ _null_ ));
+DESCR("minkowski functions");
+#define MINKOWSKI_PROCOID 4215
+DATA(insert OID = 4216 (  calculateWeightedMinkowski PGNSP PGUID 12 10000 0 0 0 f f f f t f i 4 0 701 "4817 4817 701 1022" _null_ _null_ _null_ _null_ calculateWeightedMinkowski _null_ _null_ _null_ ));
+DESCR("minkowski functions");
+#define MINKOWSKI_WEIGHTED_PROCOID 4216
+DATA(insert OID = 4220 (  normalizeMinMax PGNSP PGUID 12 10000 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_ normalizeMinMax _null_ _null_ _null_ ));
+DESCR("minkowski functions");
+#define MINMAX_NORMALIZATION 4220
+DATA(insert OID = 4221 (  normalizeGaussian PGNSP PGUID 12 10000 0 0 0 f f f f t f i 3 0 701 "701 701 701" _null_ _null_ _null_ _null_ normalizeGaussian _null_ _null_ _null_ ));
+DESCR("minkowski functions");
+#define GAUSSIAN_NORMALIZATION 4221
+// - aggregation
+DATA(insert OID = 4134 ( feature_min		PGNSP PGUID 12 1 0 0 0 f f f f f f i 2 0 2277 "2277 4817" _null_ _null_ _null_ _null_ feature_min _null_ _null_ _null_ ));
+DESCR("implementation of min");
+#define FEATURE_MIN 4134
+DATA(insert OID = 4135 ( feature_min_end	PGNSP PGUID 12 1 0 0 0 f f f f f f i 1 0 4817 "2277" _null_ _null_ _null_ _null_ feature_minmax_end _null_ _null_ _null_ ));
+DESCR("implementation of min");
+#define FEATURE_MIN_END 4135
+DATA(insert OID = 4136 ( feature_max		PGNSP PGUID 12 1 0 0 0 f f f f f f i 2 0 2277 "2277 4817" _null_ _null_ _null_ _null_ feature_max _null_ _null_ _null_ ));
+DESCR("implementation of max");
+#define FEATURE_MAX 4136
+DATA(insert OID = 4137 ( feature_max_end	PGNSP PGUID 12 1 0 0 0 f f f f f f i 1 0 4817 "2277" _null_ _null_ _null_ _null_ feature_minmax_end _null_ _null_ _null_ ));
+DESCR("implementation of max");
+#define FEATURE_MAX_END 4137
+DATA(insert OID = 5115 (  min				PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 4817 "4817" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("min");
+DATA(insert OID = 5116 (  max				PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 4817 "4817" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("max");
+
+//aggregation
+// - dummy union
+DATA(insert OID = 5101 (  standard_union	PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 701 "701" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("standard union aggregation");
+DATA(insert OID = 5102 (  algebraic_union	PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 701 "701" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("algebraic union aggregation");
+DATA(insert OID = 5103 (  bounded_union	PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 701 "701" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("bounded union aggregation");
+DATA(insert OID = 5104 (  drastic_union	PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 701 "701" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("drastic union aggregation");
+// - dummy intersect
+DATA(insert OID = 5111 (  standard_intersect	PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 701 "701" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("standard intersect aggregation");
+DATA(insert OID = 5112 (  algebraic_intersect	PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 701 "701" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("algebraic intersect aggregation");
+DATA(insert OID = 5113 (  bounded_intersect	PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 701 "701" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("bounded intersect aggregation");
+DATA(insert OID = 5114 (  drastic_intersect	PGNSP PGUID 12 1 0 0 0 t f f f f f i 1 0 701 "701" _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
+DESCR("drastic intersect aggregation");
+// - sfunc union
+DATA(insert OID = 5201 ( standard_union_sfunc			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	standard_union_sfunc  _null_ _null_ _null_ ));
+DESCR("standard union aggregation");
+DATA(insert OID = 5202 ( standard_union_final			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_	standard_union_final  _null_ _null_ _null_ ));
+DESCR("standard union aggregation");
+DATA(insert OID = 5203 (algebraic_union_sfunc    PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 1022 "1022 701" _null_ _null_ _null_ _null_ algebraic_union_sfunc  _null_ _null_ _null_));
+DESCR("algebraic union aggregation");
+DATA(insert OID = 5204 ( algebraic_union_final			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "1022" _null_ _null_ _null_ _null_	algebraic_union_final  _null_ _null_ _null_ ));
+DESCR("algebraic union aggregation");
+DATA(insert OID = 5205 ( bounded_union_sfunc			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	bounded_union_sfunc  _null_ _null_ _null_ ));
+DESCR("bounded union aggregation");
+DATA(insert OID = 5206 (  bounded_union_final	   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_ bounded_union_final  _null_ _null_ _null_ ));
+DESCR("bounded union aggregation");
+DATA(insert OID = 5207 ( drastic_union_sfunc  		PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_  drastic_union_sfunc  _null_ _null_ _null_ ));
+DESCR("drastic union aggregation");
+DATA(insert OID = 5208 ( drastic_union_final			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_	drastic_union_final  _null_ _null_ _null_ ));
+DESCR("drastic union aggregation");
+// - sfunc intersect
+DATA(insert OID = 5209 ( standard_intersect_sfunc		PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	standard_intersect_sfunc _null_ _null_ _null_ ));
+DESCR("standard intersect aggregation");
+DATA(insert OID = 5210 ( standard_intersect_final		PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_	standard_intersect_final _null_ _null_ _null_ ));
+DESCR("standard intersect aggregation");
+DATA(insert OID = 5211 ( algebraic_intersect_sfunc			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	algebraic_intersect_sfunc _null_ _null_ _null_ ));
+DESCR("algebraic intersect aggregation");
+DATA(insert OID = 5212 ( algebraic_intersect_final			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_	algebraic_intersect_final _null_ _null_ _null_ ));
+DESCR("algebraic intersect aggregation");
+DATA(insert OID = 5213 ( bounded_intersect_sfunc			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	bounded_intersect_sfunc _null_ _null_ _null_ ));
+DESCR("bounded intersect aggregation");
+DATA(insert OID = 5214 (  bounded_intersect_final	   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_ bounded_intersect_final _null_ _null_ _null_ ));
+DESCR("bounded intersect aggregation");
+DATA(insert OID = 5215 ( drastic_intersect_sfunc			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	drastic_intersect_sfunc _null_ _null_ _null_ ));
+DESCR("drastic intersect aggregation");
+DATA(insert OID = 5216 ( drastic_intersect_final			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_	drastic_intersect_final _null_ _null_ _null_ ));
+DESCR("drastic intersect aggregation");
+// - except
+DATA(insert OID = 5121 ( standard_except			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 701 "701" _null_ _null_ _null_ _null_	standard_except _null_ _null_ _null_ ));
+DESCR("standard except");
+DATA(insert OID = 5122 ( sugeno_except			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	sugeno_except _null_ _null_ _null_ ));
+DESCR("sugeno except");
+DATA(insert OID = 5152 ( sugeno			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	numeric_sugeno _null_ _null_ _null_ ));
+DESCR("sugeno complement");
+DATA(insert OID = 5123 ( yager_except			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	yager_except _null_ _null_ _null_ ));
+DESCR("yager except");
+DATA(insert OID = 5153 ( yager			PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 701 "701 701" _null_ _null_ _null_ _null_	numeric_yager _null_ _null_ _null_ ));
+DESCR("yager complement");
+
+//indexing
+DATA(insert OID = 5402 (  vaGetBitmap	   PGNSP PGUID 12 1 0 0 0 f f f f t f v 2 0 20 "2281 2281" _null_ _null_ _null_ _null_	vaGetBitmap _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5403 (  vaInsert		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 6 0 16 "2281 2281 2281 2281 2281 2281" _null_ _null_ _null_ _null_	vaInsert _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5404 (  vaBeginScan	   PGNSP PGUID 12 1 0 0 0 f f f f t f v 3 0 2281 "2281 2281 2281" _null_ _null_ _null_ _null_	vaBeginScan _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5405 (  vaReScan		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 5 0 2278 "2281 2281 2281 2281 2281" _null_ _null_ _null_ _null_ vaReScan _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5406 (  vaEndScan		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 2278 "2281" _null_ _null_ _null_ _null_ vaEndScan _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5407 (  vaMarkPos		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 2278 "2281" _null_ _null_ _null_ _null_ vaMarkPos _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5408 (  vaRestorePos		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 2278 "2281" _null_ _null_ _null_ _null_ vaRestorePos _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5409 (  vaBuild		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 3 0 2281 "2281 2281 2281" _null_ _null_ _null_ _null_ vaBuild _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5410 (  vaBuildEmpty	   PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 2278 "2281" _null_ _null_ _null_ _null_ vaBuildEmpty _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5412 (  vaBulkDelete	   PGNSP PGUID 12 1 0 0 0 f f f f t f v 4 0 2281 "2281 2281 2281 2281" _null_ _null_ _null_ _null_ vaBulkDelete _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5413 (  vaVacuumCleanup   PGNSP PGUID 12 1 0 0 0 f f f f t f v 2 0 2281 "2281 2281" _null_ _null_ _null_ _null_ vaVacuumCleanup _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5414 (  vaCanReturn	   PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 16 "2281" _null_ _null_ _null_ _null_ vaCanReturn _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5415 (  vaCostEstimate   PGNSP PGUID 12 1 0 0 0 f f f f t f v 7 0 2278 "2281 2281 2281 2281 2281 2281 2281" _null_ _null_ _null_ _null_ vaCostEstimate _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+DATA(insert OID = 5416 (  vaGetOptions		   PGNSP PGUID 12 1 0 0 0 f f f f t f s 2 0 17 "1009 16" _null_ _null_ _null_ _null_  vaGetOptions _null_ _null_ _null_ ));
+DESCR("va-file(internal)");
+#define VAOPTIONS 5416
+
+
 /*
  * Symbolic values for provolatile column: these indicate whether the result
  * of a function is dependent *only* on the values of its explicit arguments,

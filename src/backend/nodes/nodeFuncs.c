@@ -2927,6 +2927,8 @@ raw_expression_tree_walker(Node *node,
 					return true;
 				if (walker(stmt->rarg, context))
 					return true;
+				if (walker(stmt->adamStmtClause, context))
+					return true;
 			}
 			break;
 		case T_A_Expr:

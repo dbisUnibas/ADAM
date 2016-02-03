@@ -43,4 +43,6 @@ extern Oid ProcedureCreate(const char *procedureName,
 
 extern bool function_parse_error_transpose(const char *prosrc);
 
+extern Oid getReturnTypeOfProcOid(Oid procid);
+
 #endif   /* PG_PROC_FN_H */

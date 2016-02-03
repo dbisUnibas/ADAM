@@ -45,6 +45,18 @@ makeFloat(char *numericStr)
 }
 
 /*
+ *	makeFloatFloat
+ */
+Value *
+makeFloatFloat(float8 val)
+{
+	char	   *str = palloc(255);
+	sprintf(str, "%f", val);
+	
+	return makeFloat(str);
+}
+
+/*
  *	makeString
  *
  * Caller is responsible for passing a palloc'd string.

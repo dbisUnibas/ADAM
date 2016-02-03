@@ -175,6 +175,9 @@ does_not_exist_skipping(ObjectType objtype, List *objname, List *objargs)
 			msg = gettext_noop("extension \"%s\" does not exist, skipping");
 			name = NameListToString(objname);
 			break;
+		case OBJECT_ALGORITHM:
+		case OBJECT_DISTANCE:
+		case OBJECT_NORMALIZATION:
 		case OBJECT_FUNCTION:
 			msg = gettext_noop("function %s(%s) does not exist, skipping");
 			name = NameListToString(objname);

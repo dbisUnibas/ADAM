@@ -235,6 +235,24 @@ DATA(insert ( 3545	bytea_string_agg_transfn	bytea_string_agg_finalfn		0	2281	_nu
 /* json */
 DATA(insert ( 3175	json_agg_transfn	json_agg_finalfn		0	2281	_null_ ));
 
+/* ADAM */
+// - union
+DATA(insert ( 5101	standard_union_sfunc		standard_union_final			0	701		"0"));
+DATA(insert ( 5102	algebraic_union_sfunc		algebraic_union_final			0	1022	"{0,1}"));
+DATA(insert ( 5103	bounded_union_sfunc			bounded_union_final     		0	701  	"0"));
+DATA(insert ( 5104	drastic_union_sfunc			drastic_union_final	    		0	701	    "0"));
+// - intersect
+DATA(insert ( 5111	standard_intersect_sfunc	standard_intersect_final	0	701		"1"));
+DATA(insert ( 5112	algebraic_intersect_sfunc	algebraic_intersect_final	0	701		"1"));
+DATA(insert ( 5113	bounded_intersect_sfunc		bounded_intersect_final			0	701		"0"));
+DATA(insert ( 5114	drastic_intersect_sfunc		drastic_intersect_final			0	701		"1"));
+// - except (not defined here, see adam_retrieval_aggregation)
+
+// - feature
+DATA(insert ( 5115	feature_min feature_min_end	 0	2277	_null_ ));
+DATA(insert ( 5116	feature_max feature_max_end	 0	2277	_null_ ));
+
+
 /*
  * prototypes for functions in pg_aggregate.c
  */

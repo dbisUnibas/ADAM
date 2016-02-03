@@ -21,6 +21,7 @@
  */
 #include "postgres.h"
 
+#include "access/relscan.h"
 #include "executor/execdebug.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeIndexscan.h"
@@ -49,6 +50,9 @@ MultiExecBitmapIndexScan(BitmapIndexScanState *node)
 	 */
 	scandesc = node->biss_ScanDesc;
 
+	/* ADAM */
+	scandesc->adamScanClause = node->adamScanClause;
+	
 	/*
 	 * If we have runtime keys and they've not already been set up, do it now.
 	 * Array keys are also treated as runtime keys; note that if ExecReScan
@@ -312,6 +316,11 @@ ExecInitBitmapIndexScan(BitmapIndexScan *node, EState *estate, int eflags)
 		index_rescan(indexstate->biss_ScanDesc,
 					 indexstate->biss_ScanKeys, indexstate->biss_NumScanKeys,
 					 NULL, 0);
+
+	/* ADAM */
+	if(node->scan.plan.adamPlanClause){
+		indexstate->adamScanClause = node->scan.plan.adamPlanClause;
+	}
 
 	/*
 	 * all done.

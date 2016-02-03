@@ -20,6 +20,7 @@
 #include "access/htup_details.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_type.h"
+#include "utils/adam_data_feature.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/numeric.h"
@@ -216,6 +217,10 @@ format_type_internal(Oid type_oid, int32 typemod,
 			}
 			else
 				buf = pstrdup("character");
+			break;
+
+		case FEATURE:
+			buf = getFeatureName(typemod);
 			break;
 
 		case FLOAT4OID:

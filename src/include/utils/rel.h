@@ -23,6 +23,7 @@
 #include "rewrite/prs2lock.h"
 #include "storage/block.h"
 #include "storage/relfilenode.h"
+#include "utils/array.h"
 #include "utils/relcache.h"
 #include "utils/reltrigger.h"
 
@@ -152,6 +153,7 @@ typedef struct RelationData
 	uint16	   *rd_exclstrats;	/* exclusion ops' strategy numbers, if any */
 	void	   *rd_amcache;		/* available for use by index AM */
 	Oid		   *rd_indcollation;	/* OIDs of index collations */
+	ArrayType  *rd_marks;		/* ADAM */
 
 	/*
 	 * foreign-table support

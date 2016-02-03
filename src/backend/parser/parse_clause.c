@@ -15,6 +15,7 @@
 
 #include "postgres.h"
 
+#include "utils/adam_retrieval.h"
 #include "access/heapam.h"
 #include "catalog/heap.h"
 #include "catalog/pg_type.h"
@@ -2354,4 +2355,151 @@ transformFrameOffset(ParseState *pstate, int frameOptions, Node *clause)
 	checkExprIsVarFree(pstate, node, constructName);
 
 	return node;
+}
+
+/* ADAM */
+/*
+ * transforms an adam clause in the select statement, i.e.
+ * it adds a distance field to the result
+ */
+void
+adjustAdamDistanceClause(ParseState *pstate, Node *clause, List **targetList, Node **adamQueryClause)
+{
+	ListCell *cell;
+	
+	ResTarget *distTarget = NULL;
+	Node	*distExpr;
+	AdamQueryClause *queryClause = (AdamQueryClause *) (*adamQueryClause);
+		
+	//if no distance clause, no transformation necessary
+	if(clause == NULL || !IsA(clause, AdamSelectStmt)){
+		return;
+	}
+
+	//check that no double distances
+	foreach(cell, *targetList){
+		ResTarget *res = (ResTarget *) lfirst(cell);
+		
+		if(res->isFuzzy)
+			distTarget = res;
+	}
+
+	if(distTarget && distTarget->val){
+		return;
+	} else if(distTarget){
+		distExpr = adjustParseTreeForFeatureSearch(pstate, (AdamSelectStmt *) clause, adamQueryClause, -1);
+		distTarget->val = distExpr;
+	} else {
+		distExpr = adjustParseTreeForFeatureSearch(pstate, (AdamSelectStmt *) clause, adamQueryClause, -1);
+
+		distTarget = makeNode(ResTarget);
+		distTarget->indirection = NIL;
+		distTarget->isFuzzy = true;
+		distTarget->name = pstrdup("d");
+		distTarget->val = distExpr;
+	   
+		*targetList = lcons(distTarget, *targetList);
+	}
+
+	//which distance function is called is decided withing pg_opr
+	//we just rename and add it to the beginning of the target list
+}
+
+
+/*
+ * in distance queries, we add a === operation, to enforce the use of va-file indices
+ * the === is a dummy equal, i.e. it returns always true
+ */
+void
+adjustAdamWhereClause(ParseState *pstate, Node *clause, Node **whereClause, Node **adamQueryClause)
+{
+	AdamSelectStmt *optStmt;
+	A_Expr * whereExpr;
+	AdamQueryClause *queryClause = (AdamQueryClause *) (*adamQueryClause);
+
+	//if no distance clause, no transformation necessary
+	if(clause == NULL || !IsA(clause, AdamSelectStmt)){
+		return;
+	}
+
+	optStmt = (AdamSelectStmt *) clause;
+	
+	whereExpr = makeSimpleA_Expr(AEXPR_OP, "===", optStmt->l_expr, optStmt->r_expr, -1);;
+	whereExpr->mods = list_make1(optStmt->distance);
+
+	if(!*whereClause){
+		//new where clause
+		*whereClause = (Node *) whereExpr;
+		queryClause->extendedWhereClause = false;
+	} else {
+		//add to where clause
+		*whereClause = (Node *) makeA_Expr(AEXPR_AND, NIL, *whereClause, (Node *) whereExpr, -1);
+		queryClause->extendedWhereClause = true;
+	}
+}
+
+/* 
+* checks for illegal use of ORDER USING DISTANCE
+*/
+void
+adjustAdamSortClause(ParseState *pstate, Node *clause, List *targetList, List **sortClause, Node **adamQueryClause)
+{
+	ListCell *cell;
+	bool foundDistanceSorting = false;
+	bool foundFuzzyField = false;
+	AdamQueryClause *queryClause = (AdamQueryClause *) (*adamQueryClause);
+
+	//if no distance clause, no transformation necessary
+	if (clause == NULL || !IsA(clause, AdamSelectStmt)){
+		return;
+	}
+
+	if(!*sortClause){
+		*sortClause = NIL;
+	}
+
+	foreach(cell, *sortClause){
+			SortBy *sortby = (SortBy *) lfirst(cell);
+			//check each columnref
+			if(IsA(sortby->node, ColumnRef)){
+				ColumnRef *ref = (ColumnRef *) sortby->node;
+				ListCell *fieldsCell;
+				//check each field of columnref
+				foreach(fieldsCell, ref->fields){
+					char * name = strVal(lfirst(fieldsCell));
+
+					//if name is distance
+					if(strcmp(name, getDistanceFieldName()) == 0){
+						foundDistanceSorting = true;
+					}
+				}
+			}
+		}
+
+	foreach(cell, targetList){
+		ResTarget *res = (ResTarget *) lfirst(cell);
+
+		if(res->isFuzzy){
+			foundFuzzyField = true;
+		}
+	}
+
+	if(!foundFuzzyField && foundDistanceSorting){
+		//no fuzzy restarget found!
+		ereport(ERROR,
+			(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+			errmsg("ORDER USING DISTANCE is not possible if no distance calculation is performed")));
+	} else if (foundFuzzyField && !foundDistanceSorting){
+		SortBy *sort = makeNode(SortBy);
+		ColumnRef *ref = makeNode(ColumnRef);
+		
+		ref->fields = list_make1(makeString(pstrdup("d")));
+
+		sort->node = (Node *) ref;
+		sort->sortby_dir = SORTBY_ASC;
+		sort->sortby_nulls = SORTBY_NULLS_DEFAULT;
+		sort->useOp = NIL;	
+
+		*sortClause = lappend(*sortClause, sort);
+	}
 }

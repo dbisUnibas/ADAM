@@ -20,6 +20,8 @@
 #ifndef PARSENODES_H
 #define PARSENODES_H
 
+#include "utils/adam_retrieval_minkowski.h"
+
 #include "nodes/bitmapset.h"
 #include "nodes/primnodes.h"
 #include "nodes/value.h"
@@ -150,6 +152,9 @@ typedef struct Query
 
 	List	   *constraintDeps; /* a list of pg_constraint OIDs that the query
 								 * depends on to be semantically valid */
+
+	Node	   *adamQueryClause;		/* ADAM */
+
 } Query;
 
 
@@ -242,6 +247,7 @@ typedef struct A_Expr
 	Node	   *lexpr;			/* left argument, or NULL if none */
 	Node	   *rexpr;			/* right argument, or NULL if none */
 	int			location;		/* token location, or -1 if unknown */
+	List       *mods;			/* modifiers for a_expr */
 } A_Expr;
 
 /*
@@ -377,6 +383,9 @@ typedef struct ResTarget
 	List	   *indirection;	/* subscripts, field names, and '*', or NIL */
 	Node	   *val;			/* the value expression to compute or assign */
 	int			location;		/* token location, or -1 if unknown */
+	bool		isFuzzy;		/* ADAM  is distance field */
+	char	   *cleanName;	/* ADAM: used for set operation */
+	Node	   *algorithm;		/* ADAM: using algorithm */
 } ResTarget;
 
 /*
@@ -503,6 +512,7 @@ typedef struct ColumnDef
 	Oid			collOid;		/* collation OID (InvalidOid if not set) */
 	List	   *constraints;	/* other constraints on column */
 	List	   *fdwoptions;		/* per-column FDW options */
+	List	   *reloptions;		/* ADAM: reloptions */
 } ColumnDef;
 
 /*
@@ -573,7 +583,7 @@ typedef struct DefElem
 
 /*
  * LockingClause - raw representation of FOR [NO KEY] UPDATE/[KEY] SHARE
- *		options
+ * 		options
  *
  * Note: lockedRels == NIL means "all relations in query".	Otherwise it
  * is a list of RangeVar nodes.  (We use RangeVar mainly because it carries
@@ -1019,6 +1029,26 @@ typedef enum SetOperation
 	SETOP_EXCEPT
 } SetOperation;
 
+typedef enum SetOpOptionsType
+{
+	SETOP_NULL = 0,
+	SETOP_CRISP,
+	UNION_INTERSECT_STANDARD,
+	UNION_INTERSECT_ALGEBRAIC,
+	UNION_INTERSECT_BOUNDED,
+	UNION_INTERSECT_DRASTIC,
+	EXCEPT_STANDARD,
+	EXCEPT_YAGER,
+	EXCEPT_SUGENO
+} SetOpOptionsType;
+
+typedef struct SetOpOptions 
+{
+	NodeTag type;
+	SetOpOptionsType opType;
+	List      *options;
+} SetOpOptions;
+
 typedef struct SelectStmt
 {
 	NodeTag		type;
@@ -1035,6 +1065,7 @@ typedef struct SelectStmt
 	List	   *groupClause;	/* GROUP BY clauses */
 	Node	   *havingClause;	/* HAVING conditional-expression */
 	List	   *windowClause;	/* WINDOW window_name AS (...), ... */
+	Node	   *adamStmtClause;		/* ADAM: clause for distance function and normalization specification */
 
 	/*
 	 * In a "leaf" node representing a VALUES list, the above fields are all
@@ -1060,6 +1091,7 @@ typedef struct SelectStmt
 	 * These fields are used only in upper-level SelectStmts.
 	 */
 	SetOperation op;			/* type of set op */
+	Node *opOptions; /* fuzzy set operation options */
 	bool		all;			/* ALL specified? */
 	struct SelectStmt *larg;	/* left child */
 	struct SelectStmt *rarg;	/* right child */
@@ -1101,6 +1133,8 @@ typedef struct SetOperationStmt
 	List	   *colCollations;	/* OID list of output column collation OIDs */
 	List	   *groupClauses;	/* a list of SortGroupClause's */
 	/* groupClauses is NIL if UNION ALL, but must be set otherwise */
+
+	List	   *targetList;
 } SetOperationStmt;
 
 
@@ -1124,6 +1158,7 @@ typedef struct SetOperationStmt
 typedef enum ObjectType
 {
 	OBJECT_AGGREGATE,
+	OBJECT_ALGORITHM,
 	OBJECT_ATTRIBUTE,			/* type's attribute, when distinct from column */
 	OBJECT_CAST,
 	OBJECT_COLUMN,
@@ -1131,6 +1166,7 @@ typedef enum ObjectType
 	OBJECT_COLLATION,
 	OBJECT_CONVERSION,
 	OBJECT_DATABASE,
+	OBJECT_DISTANCE,
 	OBJECT_DOMAIN,
 	OBJECT_EVENT_TRIGGER,
 	OBJECT_EXTENSION,
@@ -1141,6 +1177,7 @@ typedef enum ObjectType
 	OBJECT_INDEX,
 	OBJECT_LANGUAGE,
 	OBJECT_LARGEOBJECT,
+	OBJECT_NORMALIZATION,
 	OBJECT_MATVIEW,
 	OBJECT_OPCLASS,
 	OBJECT_OPERATOR,
@@ -1250,7 +1287,8 @@ typedef enum AlterTableType
 	AT_DropInherit,				/* NO INHERIT parent */
 	AT_AddOf,					/* OF <type_name> */
 	AT_DropOf,					/* NOT OF */
-	AT_GenericOptions			/* OPTIONS (...) */
+	AT_GenericOptions,			/* OPTIONS (...) */
+	AT_AlterFeatureReloptions	/* SET (ALGORITHM ...) */
 } AlterTableType;
 
 typedef struct AlterTableCmd	/* one subcommand of an ALTER TABLE */
@@ -2076,6 +2114,14 @@ typedef struct FetchStmt
  * properties are empty.
  * ----------------------
  */
+
+/* see adam_index_marks.c for more information and in case of adjustments */
+typedef enum VAIndexMarks
+{
+	VA_MARKS_EQUIDISTANT = 1,
+	VA_MARKS_EQUIFREQUENT = 2
+} VAIndexMarks;
+
 typedef struct IndexStmt
 {
 	NodeTag		type;
@@ -2096,6 +2142,7 @@ typedef struct IndexStmt
 	bool		deferrable;		/* is the constraint DEFERRABLE? */
 	bool		initdeferred;	/* is the constraint INITIALLY DEFERRED? */
 	bool		concurrent;		/* should this be a concurrent index build? */
+	VAIndexMarks vamarks;	/* ADAM: VA indexing marks */
 } IndexStmt;
 
 /* ----------------------
@@ -2280,6 +2327,70 @@ typedef struct TransactionStmt
 	List	   *options;		/* for BEGIN/START and savepoint commands */
 	char	   *gid;			/* for two-phase-commit related commands */
 } TransactionStmt;
+
+/* ----------------------
+ *		ADAM Nodes
+ * ----------------------
+ */
+typedef struct CompositeAdamobStmt
+{
+	NodeTag		type;
+	RangeVar   *typevar;		/* the composite type to be created */
+	List	   *coldeflist;		/* list of ColumnDef nodes */
+} CompositeAdamobStmt;
+
+typedef struct AdamFunctionOptionsStmt
+{
+	NodeTag		 type;
+	Node		*funname;		/* the name of the function */
+	TypeName    *funtype;		/* the type of the function */
+	List		*defaults;		/* default options */
+} AdamFunctionOptionsStmt;
+
+typedef struct CreateAdamFunctionStmt
+{
+	CreateFunctionStmt		fstmt;	
+	TypeName   *funtype;		/* specifies what kind of function it is, e.g. algorithm, distance, index, normalization */
+} CreateAdamFunctionStmt;
+
+typedef struct MinkowskiDistanceStmt
+{
+	NodeTag		 type;
+	Node        *norm;		/* the type of the function */
+	Node		*weights;
+} MinkowskiDistanceStmt;
+
+typedef struct AdamSelectStmt
+{
+	NodeTag		 type;
+	Node		*l_expr;
+	Node		*r_expr;
+	Node		*distance;
+	Node		*normalization;
+	Node		*weight;
+	Node		*except;
+} AdamSelectStmt;
+
+typedef struct AdamQueryClause
+{
+	NodeTag		type;
+	MinkowskiNorm nn_minkowski;		/* minkowski distance */
+	int			nn_limit;			/* number of elements to retrieve */
+	bool		check_tid;			/* is a TID list given with results? */
+	bool		extendedWhereClause;
+} AdamQueryClause;
+
+
+typedef struct AdamNormalizationPrecomputeStmt
+{
+	NodeTag		type;
+	RangeVar   *relation;		/* relation to update */
+	List	   *targetList;		/* the target list (of ResTarget) */
+	Node       *distance;		/* distance function to use for normalization calculation */
+} AdamNormalizationPrecomputeStmt;
+
+typedef struct AdamQueryClause AdamPlanClause;
+typedef struct AdamQueryClause AdamScanClause;
 
 /* ----------------------
  *		Create Type Statement, composite types

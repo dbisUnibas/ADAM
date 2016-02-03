@@ -148,4 +148,16 @@ DATA(insert OID = 4016 (	4000	kd_point_ops	PGNSP PGUID ));
 DATA(insert OID = 4017 (	4000	text_ops		PGNSP PGUID ));
 #define TEXT_SPGIST_FAM_OID 4017
 
+/* ADAM */
+//btree
+DATA(insert OID = 5003 (	403		feature_ops		PGNSP PGUID ));
+DATA(insert OID = 5004 (	403		physical_ops	PGNSP PGUID ));
+
+//hash
+DATA(insert OID = 5001 (	405		feature_ops		PGNSP PGUID ));
+DATA(insert OID = 5002 (	405		physical_ops	PGNSP PGUID ));
+
+
+//bloom
+DATA(insert OID = 5005 (	5900	feature_ops		PGNSP PGUID ));
 #endif   /* PG_OPFAMILY_H */

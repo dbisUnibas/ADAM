@@ -716,6 +716,14 @@ cost_bitmap_heap_scan(Path *path, PlannerInfo *root, RelOptInfo *baserel,
 	 */
 	get_restriction_qual_cost(root, baserel, param_info, &qpqual_cost);
 
+	/* ADAM: increase cost for index then heap scan if there is an additional where clause (this would yield wrong results) */
+	if(root->parse->adamQueryClause && ((AdamQueryClause *) root->parse->adamQueryClause)->extendedWhereClause){
+		if(bitmapqual->pathtype == T_BitmapAnd){
+			startup_cost *= 0;
+			run_cost *= 0;
+		}
+	}
+
 	startup_cost += qpqual_cost.startup;
 	cpu_per_tuple = cpu_tuple_cost + qpqual_cost.per_tuple;
 
@@ -804,6 +812,12 @@ cost_bitmap_and_node(BitmapAndPath *path, PlannerInfo *root)
 		if (l != list_head(path->bitmapquals))
 			totalCost += 100.0 * cpu_operator_cost;
 	}
+
+	/* ADAM: lower cost of bitmap and */
+	if(root->parse->adamQueryClause && ((AdamQueryClause *) root->parse->adamQueryClause)->extendedWhereClause){
+		totalCost *= 0;
+	}
+
 	path->bitmapselectivity = selec;
 	path->path.rows = 0;		/* per above, not used */
 	path->path.startup_cost = totalCost;
@@ -1749,6 +1763,15 @@ initial_cost_nestloop(PlannerInfo *root, JoinCostWorkspace *workspace,
 			run_cost += (outer_path_rows - 1) * inner_rescan_run_cost;
 	}
 
+
+	/* ADAM: we do not want any joins in the case of an adam query clause */
+	if(root->parse->adamQueryClause && ((AdamQueryClause *) root->parse->adamQueryClause)->extendedWhereClause){
+		//startup_cost *= 2;
+		//run_cost *= 2;
+		//inner_rescan_run_cost *= 2;
+	}
+
+
 	/* CPU costs left for later */
 
 	/* Public result fields */
@@ -1845,6 +1868,13 @@ final_cost_nestloop(PlannerInfo *root, NestPath *path,
 
 		/* Compute number of tuples processed (not number emitted!) */
 		ntuples = outer_path_rows * inner_path_rows;
+	}
+
+	/* ADAM: we do not want any joins in the case of an adam query clause */
+	if(root->parse->adamQueryClause && ((AdamQueryClause *) root->parse->adamQueryClause)->extendedWhereClause){
+		//startup_cost *= 2;
+		//run_cost *= 2;
+		//inner_rescan_run_cost *= 2;
 	}
 
 	/* CPU costs */
@@ -2076,6 +2106,14 @@ initial_cost_mergejoin(PlannerInfo *root, JoinCostWorkspace *workspace,
 	 * workspace->total_cost, but not yet in run_cost.
 	 */
 
+
+	/* ADAM: we do not want any joins in the case of an adam query clause */
+	if(root->parse->adamQueryClause && ((AdamQueryClause *) root->parse->adamQueryClause)->extendedWhereClause){
+		//startup_cost *= 2;
+		//run_cost *= 2;
+		//inner_run_cost *= 2;
+	}
+
 	/* CPU costs left for later */
 
 	/* Public result fields */
@@ -2284,6 +2322,12 @@ final_cost_mergejoin(PlannerInfo *root, MergePath *path,
 		run_cost += mat_inner_cost;
 	else
 		run_cost += bare_inner_cost;
+	
+	/* ADAM: we do not want any joins in the case of an adam query clause */
+	if(root->parse->adamQueryClause && ((AdamQueryClause *) root->parse->adamQueryClause)->extendedWhereClause){
+		//startup_cost *= 2;
+		//run_cost *= 2;
+	}
 
 	/* CPU costs */
 
@@ -2468,6 +2512,13 @@ initial_cost_hashjoin(PlannerInfo *root, JoinCostWorkspace *workspace,
 		run_cost += seq_page_cost * (innerpages + 2 * outerpages);
 	}
 
+	
+	/* ADAM: we do not want any joins in the case of an adam query clause */
+	if(root->parse->adamQueryClause && ((AdamQueryClause *) root->parse->adamQueryClause)->extendedWhereClause){
+		//startup_cost *= 2;
+		//run_cost *= 2;
+	}
+
 	/* CPU costs left for later */
 
 	/* Public result fields */
@@ -2609,6 +2660,13 @@ final_cost_hashjoin(PlannerInfo *root, HashPath *path,
 	cost_qual_eval(&qp_qual_cost, path->jpath.joinrestrictinfo, root);
 	qp_qual_cost.startup -= hash_qual_cost.startup;
 	qp_qual_cost.per_tuple -= hash_qual_cost.per_tuple;
+
+	
+	/* ADAM: we do not want any joins in the case of an adam query clause */
+	if(root->parse->adamQueryClause && ((AdamQueryClause *) root->parse->adamQueryClause)->extendedWhereClause){
+		//startup_cost *= 2;
+		//run_cost *= 2;
+	}
 
 	/* CPU costs */
 

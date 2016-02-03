@@ -114,6 +114,7 @@ extern void CheckSetNamespace(Oid oldNspOid, Oid nspOid, Oid classid,
 				  Oid objid);
 extern Oid	QualifiedNameGetCreationNamespace(List *names, char **objname_p);
 extern RangeVar *makeRangeVarFromNameList(List *names);
+extern List* makeListFromRangeVar(RangeVar *rel);
 extern char *NameListToString(List *names);
 extern char *NameListToQuotedString(List *names);
 
@@ -147,5 +148,10 @@ extern char *namespace_search_path;
 
 extern List *fetch_search_path(bool includeImplicit);
 extern int	fetch_search_path_array(Oid *sarray, int sarray_len);
+
+
+// ADAM FUNCTIONS
+extern Oid FeatureFunctionGetIdWithNameList(List *names, Oid featurefuntype);
+extern Oid FeatureFunctionGetIdWithRangeVar(RangeVar *names, Oid featurefuntype);
 
 #endif   /* NAMESPACE_H */

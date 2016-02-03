@@ -79,4 +79,13 @@ extern DefElem *makeDefElem(char *name, Node *arg);
 extern DefElem *makeDefElemExtended(char *nameSpace, char *name, Node *arg,
 					DefElemAction defaction);
 
+
+extern Node *makeStringAConst(char *str);
+extern Node *makeIntAConst(int val);
+extern Node *makeFloatAConst(char *str);
+extern Node *makeFloatAConstFloat(float4 val);
+extern Node *makeBitStringAConst(char *str);
+extern Node *makeBooleanAConst(bool state);
+extern Node *makeNullValAConst();
+
 #endif   /* MAKEFUNC_H */

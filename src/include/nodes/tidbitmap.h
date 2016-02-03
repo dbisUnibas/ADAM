@@ -63,4 +63,7 @@ extern TBMIterator *tbm_begin_iterate(TIDBitmap *tbm);
 extern TBMIterateResult *tbm_iterate(TBMIterator *iterator);
 extern void tbm_end_iterate(TBMIterator *iterator);
 
+extern bool tbm_contains_tuple(TIDBitmap *tbm, const ItemPointer tid);
+extern int tbm_nentries(TIDBitmap *tbm);
+
 #endif   /* TIDBITMAP_H */

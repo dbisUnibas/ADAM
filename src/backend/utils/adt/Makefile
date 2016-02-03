@@ -15,7 +15,9 @@ override CFLAGS+= -mieee
 endif
 endif
 
-OBJS = acl.o arrayfuncs.o array_selfuncs.o array_typanalyze.o \
+OBJS = adam_data_feature.o \
+       adam_retrieval.o adam_retrieval_aggregation.o adam_retrieval_minkowski.o adam_retrieval_normalization.o \
+       adam_index_va.o adam_index_marks.o acl.o arrayfuncs.o array_selfuncs.o array_typanalyze.o \
 	array_userfuncs.o arrayutils.o bool.o \
 	cash.o char.o date.o datetime.o datum.o domains.o \
 	enum.o float.o format_type.o \

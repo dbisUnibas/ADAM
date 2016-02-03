@@ -92,6 +92,7 @@ _copyPlannedStmt(const PlannedStmt *from)
 	COPY_NODE_FIELD(rowMarks);
 	COPY_NODE_FIELD(relationOids);
 	COPY_NODE_FIELD(invalItems);
+	COPY_NODE_FIELD(adamPlanClause);
 	COPY_SCALAR_FIELD(nParamExec);
 
 	return newnode;
@@ -117,6 +118,7 @@ CopyPlanFields(const Plan *from, Plan *newnode)
 	COPY_NODE_FIELD(initPlan);
 	COPY_BITMAPSET_FIELD(extParam);
 	COPY_BITMAPSET_FIELD(allParam);
+	COPY_NODE_FIELD(adamPlanClause);
 }
 
 /*
@@ -2211,6 +2213,9 @@ _copyResTarget(const ResTarget *from)
 	COPY_NODE_FIELD(indirection);
 	COPY_NODE_FIELD(val);
 	COPY_LOCATION_FIELD(location);
+	COPY_SCALAR_FIELD(isFuzzy);
+	COPY_STRING_FIELD(cleanName);
+	COPY_NODE_FIELD(algorithm);
 
 	return newnode;
 }
@@ -2346,6 +2351,7 @@ _copyColumnDef(const ColumnDef *from)
 	COPY_SCALAR_FIELD(collOid);
 	COPY_NODE_FIELD(constraints);
 	COPY_NODE_FIELD(fdwoptions);
+	COPY_NODE_FIELD(reloptions);
 
 	return newnode;
 }
@@ -2455,6 +2461,7 @@ _copyQuery(const Query *from)
 	COPY_NODE_FIELD(setOperations);
 	COPY_NODE_FIELD(constraintDeps);
 
+	COPY_NODE_FIELD(adamQueryClause);
 	return newnode;
 }
 
@@ -2525,6 +2532,8 @@ _copySelectStmt(const SelectStmt *from)
 	COPY_NODE_FIELD(larg);
 	COPY_NODE_FIELD(rarg);
 
+	COPY_NODE_FIELD(adamStmtClause);
+	COPY_NODE_FIELD(opOptions);
 	return newnode;
 }
 
@@ -2856,6 +2865,7 @@ _copyIndexStmt(const IndexStmt *from)
 	COPY_SCALAR_FIELD(deferrable);
 	COPY_SCALAR_FIELD(initdeferred);
 	COPY_SCALAR_FIELD(concurrent);
+	COPY_SCALAR_FIELD(vamarks);
 
 	return newnode;
 }
@@ -3743,6 +3753,117 @@ _copyAlterTSConfigurationStmt(const AlterTSConfigurationStmt *from)
 	return newnode;
 }
 
+// ADAM FUNCTIONS
+static CreateAdamFunctionStmt *
+	_copyCreateAdamFunctionStmt(const CreateAdamFunctionStmt * from)
+{
+	CreateAdamFunctionStmt *newnode = makeNode(CreateAdamFunctionStmt);
+
+	COPY_SCALAR_FIELD(fstmt);
+	COPY_NODE_FIELD(funtype);
+
+	return newnode;
+}
+
+static AdamNormalizationPrecomputeStmt *
+	_copyAdamNormalizationPrecomputeStmt(const AdamNormalizationPrecomputeStmt * from)
+{
+	AdamNormalizationPrecomputeStmt *newnode = makeNode(AdamNormalizationPrecomputeStmt);
+
+	COPY_NODE_FIELD(relation);
+	COPY_NODE_FIELD(targetList);
+	COPY_NODE_FIELD(distance);
+
+	return newnode;
+}
+
+
+static MinkowskiDistanceStmt *
+	_copyMinkowskiDistanceStmt(const MinkowskiDistanceStmt * from)
+{
+	MinkowskiDistanceStmt *newnode = makeNode(MinkowskiDistanceStmt);
+
+	COPY_NODE_FIELD(norm);
+	COPY_NODE_FIELD(weights);
+
+	return newnode;
+}
+
+static AdamSelectStmt *
+	_copyAdamSelectStmt(const AdamSelectStmt *from)
+{
+	AdamSelectStmt *newnode = makeNode(AdamSelectStmt);
+
+	COPY_NODE_FIELD(l_expr);
+	COPY_NODE_FIELD(r_expr);
+	COPY_NODE_FIELD(distance);
+	COPY_NODE_FIELD(normalization);
+	COPY_NODE_FIELD(weight);
+	COPY_NODE_FIELD(except);
+
+	return newnode;
+}
+
+static AdamQueryClause *
+	_copyAdamQueryClause(const AdamQueryClause *from)
+{
+	AdamQueryClause *newnode = makeNode(AdamQueryClause);
+
+	COPY_SCALAR_FIELD(nn_minkowski);
+	COPY_SCALAR_FIELD(nn_limit);
+	COPY_SCALAR_FIELD(check_tid);
+	COPY_SCALAR_FIELD(extendedWhereClause);
+
+	return newnode;
+}
+
+static AdamPlanClause *
+	_copyAdamPlanClause(const AdamPlanClause *from)
+{
+	AdamPlanClause *newnode = makeNode(AdamPlanClause);
+
+	COPY_SCALAR_FIELD(nn_minkowski);
+	COPY_SCALAR_FIELD(nn_limit);
+	COPY_SCALAR_FIELD(check_tid);
+	COPY_SCALAR_FIELD(extendedWhereClause);
+
+	return newnode;
+}
+
+static AdamFunctionOptionsStmt *
+_copyAdamFunctionOptionsStmt(const AdamFunctionOptionsStmt *from)
+{
+	AdamFunctionOptionsStmt *newnode = makeNode(AdamFunctionOptionsStmt);
+
+	COPY_NODE_FIELD(funname);
+	COPY_NODE_FIELD(funtype);
+	COPY_NODE_FIELD(defaults);
+
+	return newnode;
+}
+
+static SetOpOptions *
+	_copySetOpOptions(const SetOpOptions *from)
+{
+	SetOpOptions *newnode = makeNode(SetOpOptions);
+
+	COPY_SCALAR_FIELD(opType);
+	COPY_NODE_FIELD(options);
+
+	return newnode;
+}
+
+static CompositeAdamobStmt *
+_copyCompositeAdamobStmt(const CompositeAdamobStmt *from)
+{
+	CompositeAdamobStmt *newnode = makeNode(CompositeAdamobStmt);
+
+	COPY_NODE_FIELD(typevar);
+	COPY_NODE_FIELD(coldeflist);
+
+	return newnode;
+}
+
 /* ****************************************************************
  *					pg_list.h copy functions
  * ****************************************************************
@@ -4170,6 +4291,9 @@ copyObject(const void *from)
 		case T_SetOperationStmt:
 			retval = _copySetOperationStmt(from);
 			break;
+		case T_SetOpOptions:
+			retval = _copySetOpOptions(from);
+			break;
 		case T_AlterTableStmt:
 			retval = _copyAlterTableStmt(from);
 			break;
@@ -4262,6 +4386,9 @@ copyObject(const void *from)
 			break;
 		case T_TransactionStmt:
 			retval = _copyTransactionStmt(from);
+			break;
+		case T_CompositeAdamobStmt:
+			retval = _copyCompositeAdamobStmt(from);
 			break;
 		case T_CompositeTypeStmt:
 			retval = _copyCompositeTypeStmt(from);
@@ -4541,6 +4668,26 @@ copyObject(const void *from)
 			retval = _copyXmlSerialize(from);
 			break;
 
+		case T_AdamQueryClause:
+		case T_AdamPlanClause:
+		case T_AdamScanClause:
+			retval = _copyAdamQueryClause(from);
+			break;
+		case T_AdamSelectStmt:
+			retval = _copyAdamSelectStmt(from);
+			break;
+		case T_MinkowskiDistanceStmt:
+			retval = _copyMinkowskiDistanceStmt(from);
+			break;
+		case T_AdamFunctionOptionsStmt:
+			retval = _copyAdamFunctionOptionsStmt(from);
+			break;
+		case T_CreateAdamFunctionStmt:
+			retval = _copyCreateAdamFunctionStmt(from);
+			break;
+		case T_AdamNormalizationPrecomputeStmt:
+			retval = _copyAdamNormalizationPrecomputeStmt(from);
+			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(from));
 			retval = 0;			/* keep compiler quiet */

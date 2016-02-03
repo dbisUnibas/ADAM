@@ -388,7 +388,7 @@ ConstructTupleDescriptor(Relation heapRelation,
 			to->attalign = typeTup->typalign;
 			to->attstattarget = -1;
 			to->attcacheoff = -1;
-			to->atttypmod = -1;
+			to->atttypmod = exprTypmod(indexkey);
 			to->attislocal = true;
 			to->attcollation = collationObjectId[i];
 
@@ -447,7 +447,7 @@ ConstructTupleDescriptor(Relation heapRelation,
 			typeTup = (Form_pg_type) GETSTRUCT(tuple);
 
 			to->atttypid = keyType;
-			to->atttypmod = -1;
+			//to->atttypmod = typeTup->typtypmod;
 			to->attlen = typeTup->typlen;
 			to->attbyval = typeTup->typbyval;
 			to->attalign = typeTup->typalign;
@@ -624,6 +624,8 @@ UpdateIndexRelation(Oid indexoid,
 	values[Anum_pg_index_indpred - 1] = predDatum;
 	if (predDatum == (Datum) 0)
 		nulls[Anum_pg_index_indpred - 1] = true;
+
+	nulls[Anum_pg_index_marks - 1] = true;
 
 	tuple = heap_form_tuple(RelationGetDescr(pg_index), values, nulls);
 
@@ -3546,4 +3548,54 @@ static void
 ResetReindexPending(void)
 {
 	pendingReindexedIndexes = NIL;
+}
+
+
+void
+	UpdateIndexAddMarks(Oid index, Datum marks)
+{
+	Datum		values[Natts_pg_index];
+	bool		nulls[Natts_pg_index];
+	bool		replaces[Natts_pg_index];
+
+	int			i;
+
+	Relation	pg_index;
+
+	HeapTuple	tuple;
+
+
+	for (i = 0; i < Natts_pg_index; ++i)
+	{
+		nulls[i] = true;
+		replaces[i] = false;
+		values[i] = (Datum) 0;
+	}
+
+	if(marks != (Datum) 0){
+		replaces[Anum_pg_index_marks - 1] = true;
+		nulls[Anum_pg_index_marks - 1] = false;
+		values[Anum_pg_index_marks - 1] = marks;
+	}
+
+	pg_index = heap_open(IndexRelationId, RowExclusiveLock);
+
+	tuple = SearchSysCacheCopy1(INDEXRELID, ObjectIdGetDatum(index));
+
+	if (HeapTupleIsValid(tuple)){
+		tuple = heap_modify_tuple(tuple, RelationGetDescr(pg_index), values, nulls, replaces);
+		simple_heap_update(pg_index, &tuple->t_self, tuple);
+	} else {
+		ereport(ERROR,
+			(errcode(ERRCODE_INTERNAL_ERROR),
+			errmsg("internal error in index creation")));
+	}
+
+	CatalogUpdateIndexes(pg_index, tuple);
+
+	/*
+	 * close the relation and free the tuple
+	 */
+	heap_close(pg_index, RowExclusiveLock);
+	heap_freetuple(tuple);
 }

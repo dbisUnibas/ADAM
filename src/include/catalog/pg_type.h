@@ -514,6 +514,7 @@ DATA(insert OID = 1187 ( _interval	 PGNSP PGUID	-1 f b A f t \054 0 1186 0 array
 
 /* OIDS 1200 - 1299 */
 DATA(insert OID = 1231 (  _numeric	 PGNSP PGUID -1 f b A f t \054 0	1700 0 array_in array_out array_recv array_send numerictypmodin numerictypmodout array_typanalyze i x f 0 -1 0 0 _null_ _null_ _null_ ));
+#define NUMERICARRAYOID		1231
 DATA(insert OID = 1266 ( timetz		 PGNSP PGUID 12 f b D f t \054 0	0 1270 timetz_in timetz_out timetz_recv timetz_send timetztypmodin timetztypmodout - d p f 0 -1 0 0 _null_ _null_ _null_ ));
 DESCR("time of day with time zone");
 #define TIMETZOID		1266
@@ -624,6 +625,25 @@ DATA(insert OID = 3926 ( int8range		PGNSP PGUID  -1 f r R f t \054 0 0 3927 rang
 DESCR("range of bigints");
 DATA(insert OID = 3927 ( _int8range		PGNSP PGUID  -1 f b A f t \054 0 3926 0 array_in array_out array_recv array_send - - array_typanalyze d x f 0 -1 0 0 _null_ _null_ _null_ ));
 
+
+
+/* ADAM */
+// catalog tables
+DATA(insert OID = 4711 (adam_featurefun	PGNSP PGUID -1 f c C f t \054 4318 0 0 record_in record_out record_recv record_send - - - d x f 0 -1 0 0 _null_ _null_ _null_ ));
+
+// data types
+DATA(insert OID = 4817 (  feature   PGNSP PGUID -1 f b a f t \054 0	0 0 feature_in feature_out - - - - - d x f 0 -1 0 0 _null_ _null_ _null_ ));
+DESCR("feature vector");
+#define FEATURE 4817
+
+// function types (defined as pseudo-types)
+DATA(insert OID = 4712 (algorithm	PGNSP PGUID -1 f p P f t \054 0 0 0 record_in record_out - - - - - i p f 0 -1 0 0 _null_ _null_ _null_ ));
+#define ALGORITHMOID 4712
+DATA(insert OID = 4713 (normalization		PGNSP PGUID -1 f p P f t \054 0 0 0 record_in record_out - - - - - i p f 0 -1 0 0 _null_ _null_ _null_ ));
+#define NORMALIZATIONOID 4713
+DATA(insert OID = 4714 (distance		PGNSP PGUID -1 f p P f t \054 0 0 0 record_in record_out - - - - - i p f 0 -1 0 0 _null_ _null_ _null_ ));
+#define DISTANCEOID 4714
+
 /*
  * pseudo-types
  *
@@ -697,6 +717,7 @@ DATA(insert OID = 3831 ( anyrange		PGNSP PGUID  -1 f p P f t \054 0 0 0 anyrange
 #define  TYPCATEGORY_USER		'U'
 #define  TYPCATEGORY_BITSTRING	'V'		/* er ... "varbit"? */
 #define  TYPCATEGORY_UNKNOWN	'X'
+#define  TYPCATEGORY_ADAM		'a'
 
 /* Is a type OID a polymorphic pseudotype?	(Beware of multiple evaluation) */
 #define IsPolymorphicType(typid)  \

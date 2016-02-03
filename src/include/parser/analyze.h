@@ -16,6 +16,11 @@
 
 #include "parser/parse_node.h"
 
+#include "access/heapam.h"
+#include "access/htup_details.h"
+#include "utils/rel.h"
+#include "utils/relcache.h"
+
 /* Hook for plugins to get control at end of parse analysis */
 typedef void (*post_parse_analyze_hook_type) (ParseState *pstate,
 														  Query *query);

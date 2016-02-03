@@ -379,4 +379,16 @@ DATA(insert (	3474   3831 3831 3 3471 ));
 DATA(insert (	3474   3831 3831 4 3472 ));
 DATA(insert (	3474   3831 3831 5 3473 ));
 
+/* ADAM */
+// btree
+DATA(insert (	5003   4817 4817 1 4133 ));
+DATA(insert (	5004   4818 4818 1 4144 ));
+
+// hash
+DATA(insert (	5001   4817 4817 1 4110 ));
+DATA(insert (	5002   4818 4818 1 4118 ));
+
+// VA
+DATA(insert (	5005   4817 4817 1 4110 ));
+
 #endif   /* PG_AMPROC_H */

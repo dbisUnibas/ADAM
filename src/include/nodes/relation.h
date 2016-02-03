@@ -717,6 +717,8 @@ typedef struct Path
 
 	List	   *pathkeys;		/* sort ordering of path's output */
 	/* pathkeys is a List of PathKey nodes; see above */
+
+	Node	   *adamPathClause; /* ADAM */
 } Path;
 
 /* Macro for extracting a path's parameterization relids; beware double eval */

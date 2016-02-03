@@ -16,6 +16,7 @@
 
 #include "access/tupdesc.h"
 #include "nodes/bitmapset.h"
+#include "utils/array.h"
 
 
 typedef struct RelationData *Relation;
@@ -41,6 +42,7 @@ extern List *RelationGetIndexList(Relation relation);
 extern Oid	RelationGetOidIndex(Relation relation);
 extern List *RelationGetIndexExpressions(Relation relation);
 extern List *RelationGetIndexPredicate(Relation relation);
+extern ArrayType* RelationGetMarks(Relation relation);
 extern Bitmapset *RelationGetIndexAttrBitmap(Relation relation, bool keyAttrs);
 extern void RelationGetExclusionInfo(Relation indexRelation,
 						 Oid **operators,

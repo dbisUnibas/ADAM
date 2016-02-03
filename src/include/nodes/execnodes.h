@@ -66,6 +66,7 @@ typedef struct IndexInfo
 	bool		ii_ReadyForInserts;
 	bool		ii_Concurrent;
 	bool		ii_BrokenHotChain;
+	char		ii_MarksStrategy;	/* ADAM : see IndexStmt */
 } IndexInfo;
 
 /* ----------------
@@ -1156,6 +1157,7 @@ typedef struct BitmapAndState
 	PlanState	ps;				/* its first field is NodeTag */
 	PlanState **bitmapplans;	/* array of PlanStates for my inputs */
 	int			nplans;			/* number of input plans */
+	int			limit;			/* ADAM */
 } BitmapAndState;
 
 /* ----------------
@@ -1167,6 +1169,7 @@ typedef struct BitmapOrState
 	PlanState	ps;				/* its first field is NodeTag */
 	PlanState **bitmapplans;	/* array of PlanStates for my inputs */
 	int			nplans;			/* number of input plans */
+	int			limit;			/* ADAM */
 } BitmapOrState;
 
 /* ----------------------------------------------------------------
@@ -1292,6 +1295,7 @@ typedef struct IndexOnlyScanState
 	long		ioss_HeapFetches;
 } IndexOnlyScanState;
 
+
 /* ----------------
  *	 BitmapIndexScanState information
  *
@@ -1322,6 +1326,7 @@ typedef struct BitmapIndexScanState
 	ExprContext *biss_RuntimeContext;
 	Relation	biss_RelationDesc;
 	IndexScanDesc biss_ScanDesc;
+	Node		*adamScanClause;
 } BitmapIndexScanState;
 
 /* ----------------
@@ -1346,6 +1351,7 @@ typedef struct BitmapHeapScanState
 	TBMIterator *prefetch_iterator;
 	int			prefetch_pages;
 	int			prefetch_target;
+	Node	   *adamScanClause;
 } BitmapHeapScanState;
 
 /* ----------------

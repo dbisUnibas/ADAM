@@ -66,6 +66,8 @@ typedef struct PlannedStmt
 
 	List	   *invalItems;		/* other dependencies, as PlanInvalItems */
 
+	Node	   *adamPlanClause;		/* ADAM */
+
 	int			nParamExec;		/* number of PARAM_EXEC Params used */
 } PlannedStmt;
 
@@ -125,6 +127,7 @@ typedef struct Plan
 	 */
 	Bitmapset  *extParam;
 	Bitmapset  *allParam;
+	Node	   *adamPlanClause;
 } Plan;
 
 /* ----------------

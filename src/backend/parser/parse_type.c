@@ -331,6 +331,14 @@ typenameTypeMod(ParseState *pstate, const TypeName *typeName, Type typ)
 				IsA(linitial(cr->fields), String))
 				cstr = strVal(linitial(cr->fields));
 		}
+		else if (IsA(tm, TypeName))
+		{
+			TypeName  *tn = (TypeName *) tm;
+			Oid		   id = typenameTypeId(NULL, tn);
+
+			cstr = (char *) palloc(32);
+			snprintf(cstr, 32, "%i", id);
+		}
 		if (!cstr)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),

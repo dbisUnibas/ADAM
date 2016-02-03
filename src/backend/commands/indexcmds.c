@@ -537,6 +537,7 @@ DefineIndex(IndexStmt *stmt,
 	indexInfo->ii_ReadyForInserts = !stmt->concurrent;
 	indexInfo->ii_Concurrent = stmt->concurrent;
 	indexInfo->ii_BrokenHotChain = false;
+	indexInfo->ii_MarksStrategy = stmt->vamarks;
 
 	typeObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	collationObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));

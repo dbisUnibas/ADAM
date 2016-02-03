@@ -343,7 +343,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 											   false);
 
 	/* perform the necessary typecasting of arguments */
-	make_fn_arguments(pstate, fargs, actual_arg_types, declared_arg_types);
+	make_fn_arguments(pstate, fargs, actual_arg_types, declared_arg_types, NULL);
 
 	/*
 	 * If it's a variadic function call, transform the last nvargs arguments
@@ -1333,10 +1333,12 @@ void
 make_fn_arguments(ParseState *pstate,
 				  List *fargs,
 				  Oid *actual_arg_types,
-				  Oid *declared_arg_types)
+				  Oid *declared_arg_types,
+				  int32 *typmods)
 {
 	ListCell   *current_fargs;
 	int			i = 0;
+	int32		typmod = -1;
 
 	foreach(current_fargs, fargs)
 	{
@@ -1345,6 +1347,9 @@ make_fn_arguments(ParseState *pstate,
 		{
 			Node	   *node = (Node *) lfirst(current_fargs);
 
+			if(typmods != NULL){
+				typmod = typmods[i];
+			}
 			/*
 			 * If arg is a NamedArgExpr, coerce its input expr instead --- we
 			 * want the NamedArgExpr to stay at the top level of the list.
@@ -1356,7 +1361,7 @@ make_fn_arguments(ParseState *pstate,
 				node = coerce_type(pstate,
 								   (Node *) na->arg,
 								   actual_arg_types[i],
-								   declared_arg_types[i], -1,
+								   declared_arg_types[i], typmod,
 								   COERCION_IMPLICIT,
 								   COERCE_IMPLICIT_CAST,
 								   -1);
@@ -1367,7 +1372,7 @@ make_fn_arguments(ParseState *pstate,
 				node = coerce_type(pstate,
 								   node,
 								   actual_arg_types[i],
-								   declared_arg_types[i], -1,
+								   declared_arg_types[i], typmod,
 								   COERCION_IMPLICIT,
 								   COERCE_IMPLICIT_CAST,
 								   -1);

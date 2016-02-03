@@ -221,6 +221,14 @@ coerce_type(ParseState *pstate, Node *node,
 			return node;
 		}
 	}
+	
+	// ADAM FUNCTIONS
+	if (targetTypeId == FEATURE && (type_is_array(inputTypeId) || inputTypeId == UNKNOWNOID) && ccontext == COERCION_EXPLICIT){
+		return coerce_type(pstate, node,
+			ANYARRAYOID, FEATURE, targetTypeMod,
+			COERCION_EXPLICIT, cformat, location);
+	}
+	
 	if (inputTypeId == UNKNOWNOID && IsA(node, Const))
 	{
 		/*
@@ -268,7 +276,7 @@ coerce_type(ParseState *pstate, Node *node,
 		 * or it won't be able to obey the bizarre SQL-spec input rules. (Ugly
 		 * as sin, but so is this part of the spec...)
 		 */
-		if (baseTypeId == INTERVALOID)
+		if (baseTypeId == INTERVALOID || baseTypeId == FEATURE)
 			inputTypeMod = baseTypeMod;
 		else
 			inputTypeMod = -1;
@@ -507,6 +515,11 @@ can_coerce_type(int nargs, Oid *input_typeids, Oid *target_typeids,
 		/* accept if target is ANY */
 		if (targetTypeId == ANYOID)
 			continue;
+
+		// ADAM FUNCTIONS
+		if (targetTypeId == FEATURE && (type_is_array(inputTypeId) || inputTypeId == UNKNOWNOID) && ccontext == COERCION_EXPLICIT){
+			continue;
+		}
 
 		/* accept if target is polymorphic, for now */
 		if (IsPolymorphicType(targetTypeId))

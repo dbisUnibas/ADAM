@@ -26,6 +26,8 @@
 #include <syslog.h>
 #endif
 
+#include "utils/adam_index_va.h"
+
 #include "access/gin.h"
 #include "access/transam.h"
 #include "access/twophase.h"
@@ -671,6 +673,15 @@ static struct config_bool ConfigureNamesBool[] =
 			NULL
 		},
 		&enable_indexscan,
+		true,
+		NULL, NULL, NULL
+	},
+	{
+		{"enable_vascan", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enables the planner's use of VA indexing-scan plans."),
+			NULL
+		},
+		&enable_vascan,
 		true,
 		NULL, NULL, NULL
 	},

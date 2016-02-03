@@ -359,4 +359,9 @@ DATA(insert ( 1560 1560 1685 i f ));
 DATA(insert ( 1562 1562 1687 i f ));
 DATA(insert ( 1700 1700 1703 i f ));
 
+//ADAM
+DATA(insert ( 1231 4817 4926 i f ));
+DATA(insert ( 4817 1231 4925 i f ));
+DATA(insert (   17 4818    0 i b ));
+
 #endif   /* PG_CAST_H */

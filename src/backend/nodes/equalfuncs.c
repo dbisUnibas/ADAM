@@ -929,6 +929,8 @@ _equalSelectStmt(const SelectStmt *a, const SelectStmt *b)
 	COMPARE_NODE_FIELD(larg);
 	COMPARE_NODE_FIELD(rarg);
 
+	COMPARE_NODE_FIELD(adamStmtClause);
+	COMPARE_NODE_FIELD(opOptions);
 	return true;
 }
 
@@ -2330,6 +2332,26 @@ _equalXmlSerialize(const XmlSerialize *a, const XmlSerialize *b)
 	return true;
 }
 
+// ADAM FUNCTIONS
+
+static bool
+_equalCompositeAdamobStmt(const CompositeAdamobStmt *a, const CompositeAdamobStmt *b)
+{
+	COMPARE_NODE_FIELD(typevar);
+	COMPARE_NODE_FIELD(coldeflist);
+
+	return true;
+}
+
+static bool
+_equalSetOpOptionsStmt(const SetOpOptions *a, const SetOpOptions *b)
+{
+	COMPARE_SCALAR_FIELD(opType);
+	COMPARE_NODE_FIELD(options);
+
+	return true;
+}
+
 /*
  * Stuff from pg_list.h
  */
@@ -2644,6 +2666,9 @@ equal(const void *a, const void *b)
 		case T_SetOperationStmt:
 			retval = _equalSetOperationStmt(a, b);
 			break;
+		case T_SetOpOptions:
+			retval = _equalSetOpOptionsStmt(a, b);
+			break;
 		case T_AlterTableStmt:
 			retval = _equalAlterTableStmt(a, b);
 			break;
@@ -2736,6 +2761,9 @@ equal(const void *a, const void *b)
 			break;
 		case T_TransactionStmt:
 			retval = _equalTransactionStmt(a, b);
+			break;
+		case T_CompositeAdamobStmt:
+			retval = _equalCompositeAdamobStmt(a, b);
 			break;
 		case T_CompositeTypeStmt:
 			retval = _equalCompositeTypeStmt(a, b);

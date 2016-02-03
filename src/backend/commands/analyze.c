@@ -97,9 +97,6 @@ static void compute_index_stats(Relation onerel, double totalrows,
 					MemoryContext col_context);
 static VacAttrStats *examine_attribute(Relation onerel, int attnum,
 				  Node *index_expr);
-static int acquire_sample_rows(Relation onerel, int elevel,
-					HeapTuple *rows, int targrows,
-					double *totalrows, double *totaldeadrows);
 static int	compare_rows(const void *a, const void *b);
 static int acquire_inherited_sample_rows(Relation onerel, int elevel,
 							  HeapTuple *rows, int targrows,
@@ -1061,7 +1058,7 @@ BlockSampler_Next(BlockSampler bs)
  * block.  The previous sampling method put too much credence in the row
  * density near the start of the table.
  */
-static int
+int
 acquire_sample_rows(Relation onerel, int elevel,
 					HeapTuple *rows, int targrows,
 					double *totalrows, double *totaldeadrows)

@@ -15,6 +15,7 @@
 
 #include "postgres.h"
 
+#include "utils/adam_data_feature.h"
 #include "access/gist_private.h"
 #include "access/hash.h"
 #include "access/htup_details.h"
@@ -176,6 +177,13 @@ static relopt_int intRelOpts[] =
 			"Age at which VACUUM should perform a full table sweep to replace old Xid values with FrozenXID",
 			RELOPT_KIND_HEAP | RELOPT_KIND_TOAST
 		}, -1, 0, 2000000000
+	},
+	{
+		{
+			"vamarks",
+			"Marks calculation type",
+			RELOPT_KIND_VA
+		}, -1, 0, 100
 	},
 	/* list terminator */
 	{{NULL}}
@@ -1252,7 +1260,11 @@ attribute_reloptions(Datum reloptions, bool validate)
 	int			numoptions;
 	static const relopt_parse_elt tab[] = {
 		{"n_distinct", RELOPT_TYPE_REAL, offsetof(AttributeOpts, n_distinct)},
-		{"n_distinct_inherited", RELOPT_TYPE_REAL, offsetof(AttributeOpts, n_distinct_inherited)}
+		{"n_distinct_inherited", RELOPT_TYPE_REAL, offsetof(AttributeOpts, n_distinct_inherited)},
+		{"adam_algorithm", RELOPT_TYPE_STRING, offsetof(AttributeOpts, adam_algorithm)},
+		{"adam_index", RELOPT_TYPE_STRING, offsetof(AttributeOpts, adam_index)},
+		{"adam_distance", RELOPT_TYPE_STRING, offsetof(AttributeOpts, adam_distance)},
+		{"adam_normalization", RELOPT_TYPE_STRING, offsetof(AttributeOpts, adam_normalization)},
 	};
 
 	options = parseRelOptions(reloptions, validate, RELOPT_KIND_ATTRIBUTE,

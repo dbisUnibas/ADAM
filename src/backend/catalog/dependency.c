@@ -14,6 +14,9 @@
  */
 #include "postgres.h"
 
+#include "commands/adam_data_featurefunctioncmds.h"
+#include "catalog/adam_data_featurefunction.h"
+#include "catalog/adam_data_featurefunction_fn.h"
 #include "access/htup_details.h"
 #include "access/xact.h"
 #include "catalog/dependency.h"
@@ -154,7 +157,8 @@ static const Oid object_classes[MAX_OCLASS] = {
 	UserMappingRelationId,		/* OCLASS_USER_MAPPING */
 	DefaultAclRelationId,		/* OCLASS_DEFACL */
 	ExtensionRelationId,		/* OCLASS_EXTENSION */
-	EventTriggerRelationId		/* OCLASS_EVENT_TRIGGER */
+	EventTriggerRelationId,		/* OCLASS_EVENT_TRIGGER */
+	AdamFeatureFunRelationId,   /* OCLASS_ADAMFEATUREFUN */
 };
 
 
@@ -1249,6 +1253,9 @@ doDeletion(const ObjectAddress *object, int flags)
 			RemoveEventTriggerById(object->objectId);
 			break;
 
+		case OCLASS_ADAMFEATUREFUN:
+			removeFeatureFun(object->objectId);
+			break;
 		default:
 			elog(ERROR, "unrecognized object class: %u",
 				 object->classId);
@@ -2308,6 +2315,8 @@ getObjectClass(const ObjectAddress *object)
 
 		case EventTriggerRelationId:
 			return OCLASS_EVENT_TRIGGER;
+		case AdamFeatureFunRelationId:
+			return OCLASS_ADAMFEATUREFUN;
 	}
 
 	/* shouldn't get here */

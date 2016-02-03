@@ -21,6 +21,10 @@ typedef struct AttributeOpts
 	int32		vl_len_;		/* varlena header (do not touch directly!) */
 	float8		n_distinct;
 	float8		n_distinct_inherited;
+	Oid			adam_algorithm;
+	Oid			adam_index;
+	Oid			adam_normalization;
+	Oid			adam_distance;
 } AttributeOpts;
 
 AttributeOpts *get_attribute_options(Oid spcid, int attnum);

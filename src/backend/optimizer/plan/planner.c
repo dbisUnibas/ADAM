@@ -254,6 +254,7 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	result->invalItems = glob->invalItems;
 	result->nParamExec = glob->nParamExec;
 
+	result->adamPlanClause = parse->adamQueryClause;
 	return result;
 }
 
@@ -1269,6 +1270,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 		else
 			best_path = sorted_path;
 
+		best_path->adamPathClause = parse->adamQueryClause;
 		/*
 		 * Check to see if it's possible to optimize MIN/MAX aggregates. If
 		 * so, we will forget all the work we did so far to choose a "regular"

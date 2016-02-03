@@ -361,6 +361,7 @@ typedef enum NodeTag
 	T_AlterExtensionContentsStmt,
 	T_CreateEventTrigStmt,
 	T_AlterEventTrigStmt,
+	T_SetOpOptions,
 	T_RefreshMatViewStmt,
 
 	/*
@@ -424,7 +425,22 @@ typedef enum NodeTag
 	T_WindowObjectData,			/* private in nodeWindowAgg.c */
 	T_TIDBitmap,				/* in nodes/tidbitmap.h */
 	T_InlineCodeBlock,			/* in nodes/parsenodes.h */
-	T_FdwRoutine				/* in foreign/fdwapi.h */
+	T_FdwRoutine,				/* in foreign/fdwapi.h */
+
+	/*
+	 * TAGS FOR ADAM
+	 */	
+	T_CreateAdamFunctionStmt,
+	T_AdamColumnDef,
+	T_AdamSelectStmt,
+	T_AdamFunctionOptionsStmt,
+	T_MinkowskiDistanceStmt,
+	T_CompositeAdamobStmt,
+	T_AdamQueryClause,
+	T_AdamPlanClause,
+	T_AdamScanClause,
+	T_AdamNormalizationPrecomputeStmt
+
 } NodeTag;
 
 /*

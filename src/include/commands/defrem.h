@@ -16,6 +16,40 @@
 
 #include "nodes/parsenodes.h"
 
+#include "access/genam.h"
+#include "access/heapam.h"
+#include "access/htup_details.h"
+#include "access/sysattr.h"
+#include "catalog/dependency.h"
+#include "catalog/indexing.h"
+#include "catalog/objectaccess.h"
+#include "catalog/pg_aggregate.h"
+#include "catalog/pg_cast.h"
+#include "catalog/pg_language.h"
+#include "catalog/pg_namespace.h"
+#include "catalog/pg_proc.h"
+#include "catalog/pg_proc_fn.h"
+#include "catalog/pg_type.h"
+#include "catalog/pg_type_fn.h"
+#include "commands/alter.h"
+#include "commands/defrem.h"
+#include "commands/proclang.h"
+#include "miscadmin.h"
+#include "optimizer/var.h"
+#include "parser/parse_coerce.h"
+#include "parser/parse_collate.h"
+#include "parser/parse_expr.h"
+#include "parser/parse_func.h"
+#include "parser/parse_type.h"
+#include "utils/acl.h"
+#include "utils/builtins.h"
+#include "utils/fmgroids.h"
+#include "utils/guc.h"
+#include "utils/lsyscache.h"
+#include "utils/rel.h"
+#include "utils/syscache.h"
+#include "utils/tqual.h"
+
 /* commands/dropcmds.c */
 extern void RemoveObjects(DropStmt *stmt);
 
@@ -53,6 +87,15 @@ extern void IsThereFunctionInNamespace(const char *proname, int pronargs,
 						   oidvector *proargtypes, Oid nspOid);
 extern void ExecuteDoStmt(DoStmt *stmt);
 extern Oid	get_cast_oid(Oid sourcetypeid, Oid targettypeid, bool missing_ok);
+
+/* done for adam */
+extern void compute_return_type(TypeName *returnType, Oid languageOid, Oid *prorettype_p, bool *returnsSet_p);
+extern void compute_attributes_sql_style(List *options, List **as, char **language, bool *windowfunc_p,	 char *volatility_p, bool *strict_p, bool *security_definer, bool *leakproof_p, ArrayType **proconfig, float4 *procost,float4 *prorows);
+extern void compute_attributes_with_style(List *parameters, bool *isStrict_p, char *volatility_p);
+extern void interpret_AS_clause(Oid languageOid, const char *languageName,char *funcname, List *as, char **prosrc_str_p, char **probin_str_p);
+extern ArrayType * update_proconfig_value(ArrayType *a, List *set_items);
+extern void examine_parameter_list(List *parameters, Oid languageOid, const char *queryString, oidvector **parameterTypes, ArrayType **allParameterTypes, ArrayType **parameterModes, ArrayType **parameterNames, List **parameterDefaults, Oid *requiredResultType);
+
 
 /* commands/operatorcmds.c */
 extern Oid	DefineOperator(List *names, List *parameters);

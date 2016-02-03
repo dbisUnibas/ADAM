@@ -147,7 +147,8 @@ static void insertSelectOptions(SelectStmt *stmt,
 								Node *limitOffset, Node *limitCount,
 								WithClause *withClause,
 								core_yyscan_t yyscanner);
-static Node *makeSetOp(SetOperation op, bool all, Node *larg, Node *rarg);
+static Node *makeSetOpOptions(SetOpOptionsType type);
+static Node *makeSetOp(SetOperation op, Node * opOptions, bool all, Node *larg, Node *rarg);
 static Node *doNegate(Node *n, int location);
 static void doNegateFloat(Value *v);
 static Node *makeAArrayExpr(List *elements, int location);
@@ -194,6 +195,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	TypeName			*typnam;
 	FunctionParameter   *fun_param;
 	FunctionParameterMode fun_param_mode;
+	VAIndexMarks		 marks;
 	FuncWithArgs		*funwithargs;
 	DefElem				*defelt;
 	SortBy				*sortby;
@@ -209,6 +211,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	struct PrivTarget	*privtarget;
 	AccessPriv			*accesspriv;
 	InsertStmt			*istmt;
+	SetOpOptions	*setopOptions;
 	VariableSetStmt		*vsetstmt;
 }
 
@@ -250,6 +253,24 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
+
+
+
+/* Grammar for use with ADAM */
+%type <node>	CreateAdamFunctionStmt
+%type <typnam>	AdamFeature
+%type <node>	OptAlgorithmFunction OptNormalizationFunction OptFeatureFunctionName
+%type <node>	OptDistanceFunction OptDistanceFunctionName OptMinkowskiWeights
+%type <list>	OptDistanceParametersList OptNormalizationParametersList OptAlgorithmParametersList 
+%type <list>    FeatureFunctionParametersList
+%type <node>	FeatureFunctionParameter
+%type <node>	OptWeight
+%type <node>	OptIntersectUnion OptExcept
+%type <node>	VAIndexStmt 
+%type <marks>   VAIndexMarksStmt
+%type <node>	MinkowskiFunctionDefaultOption FeatureFunctionDefaultOption
+%type <list>	OptAdditionalFuncArgs
+%type <node>	PrecomputeNormalizationStmt OptPrecomputeDistanceFunction
 
 %type <node>	alter_column_default opclass_item opclass_drop alter_using
 %type <ival>	add_drop opt_asc_desc opt_nulls_order
@@ -513,30 +534,30 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 /* ordinary key words in alphabetical order */
 %token <keyword> ABORT_P ABSOLUTE_P ACCESS ACTION ADD_P ADMIN AFTER
-	AGGREGATE ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
+	AGGREGATE ALGEBRAIC ALGORITHM ALL ALSO ALTER ALWAYS ANALYSE ANALYZE AND ANY ARRAY AS ASC
 	ASSERTION ASSIGNMENT ASYMMETRIC AT ATTRIBUTE AUTHORIZATION
 
 	BACKWARD BEFORE BEGIN_P BETWEEN BIGINT BINARY BIT
-	BOOLEAN_P BOTH BY
+	BOOLEAN_P BOTH BOUNDED BY
 
 	CACHE CALLED CASCADE CASCADED CASE CAST CATALOG_P CHAIN CHAR_P
 	CHARACTER CHARACTERISTICS CHECK CHECKPOINT CLASS CLOSE
 	CLUSTER COALESCE COLLATE COLLATION COLUMN COMMENT COMMENTS COMMIT
 	COMMITTED CONCURRENTLY CONFIGURATION CONNECTION CONSTRAINT CONSTRAINTS
-	CONTENT_P CONTINUE_P CONVERSION_P COPY COST CREATE
+	CONTENT_P CONTINUE_P CONVERSION_P COPY COST CREATE CRISP
 	CROSS CSV CURRENT_P
 	CURRENT_CATALOG CURRENT_DATE CURRENT_ROLE CURRENT_SCHEMA
 	CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR CYCLE
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DECLARE DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DESC
-	DICTIONARY DISABLE_P DISCARD DISTINCT DO DOCUMENT_P DOMAIN_P DOUBLE_P DROP
+	DICTIONARY DISABLE_P DISCARD DISTANCE DISTINCT DO DOCUMENT_P DOMAIN_P DOUBLE_P DRASTIC DROP
 
-	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ESCAPE EVENT EXCEPT
-	EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN
+	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P EQUIDISTANT EQUIFREQUENT
+	ESCAPE EVENT EXCEPT EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN
 	EXTENSION EXTERNAL EXTRACT
 
-	FALSE_P FAMILY FETCH FIRST_P FLOAT_P FOLLOWING FOR FORCE FOREIGN FORWARD
+	FALSE_P FAMILY FEATURE_P FETCH FIRST_P FLOAT_P FOLLOWING FOR FORCE FOREIGN FORWARD
 	FREEZE FROM FULL FUNCTION FUNCTIONS
 
 	GLOBAL GRANT GRANTED GREATEST GROUP_P
@@ -556,9 +577,10 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL
 	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P
 
-	MAPPING MATCH MATERIALIZED MAXVALUE MINUTE_P MINVALUE MODE MONTH_P MOVE
+	MAPPING MARKS MATCH MATERIALIZED MAX_P MAXVALUE MINKOWSKI MINUTE_P 
+	MINVALUE MODE MONTH_P MOVE
 
-	NAME_P NAMES NATIONAL NATURAL NCHAR NEXT NO NONE
+	NAME_P NAMES NATIONAL NATURAL NCHAR NEXT NO NONE NORMALIZATION
 	NOT NOTHING NOTIFY NOTNULL NOWAIT NULL_P NULLIF
 	NULLS_P NUMERIC
 
@@ -566,7 +588,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	ORDER OUT_P OUTER_P OVER OVERLAPS OVERLAY OWNED OWNER
 
 	PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS POSITION
-	PRECEDING PRECISION PRESERVE PREPARE PREPARED PRIMARY
+	PRECEDING PRECISION PRECOMPUTE PRESERVE PREPARE PREPARED PRIMARY
 	PRIOR PRIVILEGES PROCEDURAL PROCEDURE PROGRAM
 
 	QUOTE
@@ -578,8 +600,8 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 	SAVEPOINT SCHEMA SCROLL SEARCH SECOND_P SECURITY SELECT SEQUENCE SEQUENCES
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SETOF SHARE
-	SHOW SIMILAR SIMPLE SMALLINT SNAPSHOT SOME STABLE STANDALONE_P START
-	STATEMENT STATISTICS STDIN STDOUT STORAGE STRICT_P STRIP_P SUBSTRING
+	SHOW SIMILAR SIMPLE SMALLINT SNAPSHOT SOME STABLE STANDALONE_P STANDARD START
+	STATEMENT STATISTICS STDIN STDOUT STORAGE STRICT_P STRIP_P SUBSTRING SUGENO
 	SYMMETRIC SYSID SYSTEM_P
 
 	TABLE TABLES TABLESPACE TEMP TEMPLATE TEMPORARY TEXT_P THEN TIME TIMESTAMP
@@ -589,15 +611,15 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	UNBOUNDED UNCOMMITTED UNENCRYPTED UNION UNIQUE UNKNOWN UNLISTEN UNLOGGED
 	UNTIL UPDATE USER USING
 
-	VACUUM VALID VALIDATE VALIDATOR VALUE_P VALUES VARCHAR VARIADIC VARYING
+	VA VACUUM VALID VALIDATE VALIDATOR VALUE_P VALUES VARCHAR VARIADIC VARYING
 	VERBOSE VERSION_P VIEW VOLATILE
 
-	WHEN WHERE WHITESPACE_P WINDOW WITH WITHOUT WORK WRAPPER WRITE
+	WEIGHTED WHEN WHERE WHITESPACE_P WINDOW WITH WITHOUT WORK WRAPPER WRITE
 
 	XML_P XMLATTRIBUTES XMLCONCAT XMLELEMENT XMLEXISTS XMLFOREST XMLPARSE
 	XMLPI XMLROOT XMLSERIALIZE
 
-	YEAR_P YES_P
+	YAGER YEAR_P YES_P
 
 	ZONE
 
@@ -733,6 +755,7 @@ stmt :
 			| CommentStmt
 			| ConstraintsSetStmt
 			| CopyStmt
+			| CreateAdamFunctionStmt
 			| CreateAsStmt
 			| CreateAssertStmt
 			| CreateCastStmt
@@ -794,6 +817,7 @@ stmt :
 			| LoadStmt
 			| LockStmt
 			| NotifyStmt
+			| PrecomputeNormalizationStmt
 			| PrepareStmt
 			| ReassignOwnedStmt
 			| ReindexStmt
@@ -811,6 +835,7 @@ stmt :
 			| UnlistenStmt
 			| UpdateStmt
 			| VacuumStmt
+			| VAIndexStmt
 			| VariableResetStmt
 			| VariableSetStmt
 			| VariableShowStmt
@@ -2226,6 +2251,342 @@ reloption_elem:
 					$$ = makeDefElemExtended($1, $3, NULL, DEFELEM_UNSPEC);
 				}
 		;
+
+/*****************************************************************************
+ *
+ *	ADAM GRAMMAR
+ *
+ *****************************************************************************/
+
+
+/*
+ * Data type
+ */
+
+ AdamFeature:
+			FEATURE_P
+				{
+					$$ = SystemTypeName("feature");
+					$$->typmods = list_make1(SystemTypeName("numeric"));
+					$$->location = @1;
+				}
+		;
+
+
+FeatureFunctionDefaultOption:
+			Iconst
+				{
+					$$ = (Node *) makeInteger($1);
+				}
+			| FCONST
+				{
+					$$ = (Node *) makeFloat($1);
+				}
+			| Sconst
+				{
+					$$ = (Node *) makeString($1);
+				}
+		;
+
+
+MinkowskiFunctionDefaultOption:
+			  Iconst
+				{
+					$$ = (Node *) makeInteger($1);
+				}
+			| FCONST
+				{
+					$$ = (Node *) makeFloat($1);
+				};
+			/*| MAX_P
+			 *	{
+			 *		$$ = (Node *) makeFloat(pstrdup("-1"));
+			 * 	}*/
+
+
+/*
+ * Algorithm, Distance, Index, Normalization Functions for Adam datatypes
+ */
+
+CreateAdamFunctionStmt:
+			CREATE opt_or_replace ALGORITHM func_name func_args
+			RETURNS AdamFeature createfunc_opt_list opt_definition
+				{
+					CreateAdamFunctionStmt *n = makeNode(CreateAdamFunctionStmt);
+					n->fstmt.replace = $2;
+					n->fstmt.funcname = $4;
+					n->fstmt.parameters = $5;
+					n->fstmt.returnType = $7;
+					n->funtype = SystemTypeName("algorithm");
+					n->fstmt.options = $8;
+					n->fstmt.withClause = $9;
+					$$ = (Node *)n;
+				}
+				| CREATE opt_or_replace DISTANCE func_name '(' AdamFeature ',' AdamFeature  OptAdditionalFuncArgs ')'
+			RETURNS Numeric createfunc_opt_list opt_definition
+				{
+					CreateAdamFunctionStmt *n = makeNode(CreateAdamFunctionStmt);
+					FunctionParameter *p1 = makeNode(FunctionParameter);
+					FunctionParameter *p2 = makeNode(FunctionParameter);
+
+					n->fstmt.replace = $2;
+					n->fstmt.funcname = $4;
+					
+					p1->name = NULL;
+					p1->argType = $6;
+					p1->mode = FUNC_PARAM_IN;
+					p1->defexpr = NULL;
+
+					p2->name = NULL;
+					p2->argType = $8;
+					p2->mode = FUNC_PARAM_IN;
+					p2->defexpr = NULL;
+
+					n->fstmt.parameters = list_concat(list_make2(p1, p2), $9);
+
+					n->fstmt.returnType = $12;
+					n->funtype =  SystemTypeName("d");
+					n->fstmt.options = $13;
+					n->fstmt.withClause = $14;
+					$$ = (Node *)n;
+				}
+				| CREATE opt_or_replace NORMALIZATION func_name '(' Numeric OptAdditionalFuncArgs ')'
+			RETURNS Numeric createfunc_opt_list opt_definition
+				{
+					CreateAdamFunctionStmt *n = makeNode(CreateAdamFunctionStmt);
+					FunctionParameter *p = makeNode(FunctionParameter);
+
+					n->fstmt.replace = $2;
+					n->fstmt.funcname = $4;
+					
+					p->name = NULL;
+					p->argType = $6;
+					p->mode = FUNC_PARAM_IN;
+					p->defexpr = NULL;
+					n->fstmt.parameters = list_concat(list_make1(p), $7);
+
+					n->fstmt.returnType = $10;
+					n->funtype =  SystemTypeName("normalization");
+					n->fstmt.options = $11;
+					n->fstmt.withClause = $12;
+					$$ = (Node *)n;
+				}
+		;
+
+OptAdditionalFuncArgs:
+			',' func_args_list
+				{
+					$$ = $2;
+				}
+		    | /* EMPTY */
+				{
+					$$ = NIL;
+				}
+		;
+
+OptDistanceFunction:
+			USING OptWeight DISTANCE OptDistanceFunctionName '(' a_expr ',' a_expr OptDistanceParametersList ')' OptNormalizationFunction
+				{
+					AdamSelectStmt *n = makeNode(AdamSelectStmt);
+					AdamFunctionOptionsStmt *d = makeNode(AdamFunctionOptionsStmt);
+					
+					n->l_expr = $6;
+					n->r_expr = $8;
+
+					d->funtype = SystemTypeName("d");
+					d->funname =  $4;
+					d->defaults = $9;
+					n->distance = (Node *) d;
+					
+					n->normalization = $11;
+					
+					n->weight = $2;
+
+					$$ = (Node *) n;
+				}
+		  | /* EMPTY */
+				{
+					$$ = NULL;
+				}
+	;
+
+
+OptWeight:
+			WEIGHTED AexprConst
+				{
+					$$ = $2;
+				}
+			| /* EMPTY */
+				{
+					$$ = NULL;
+				}
+	;
+
+
+OptFeatureFunctionName:
+			any_name
+				{
+					$$ =  (Node *) makeRangeVarFromAnyName($1, @1, yyscanner);					
+				}
+			| /* EMPTY */
+				{
+					$$ = NULL;
+				}
+	;
+
+OptDistanceFunctionName:
+			any_name
+				{
+					$$ =  (Node *) makeRangeVarFromAnyName($1, @1, yyscanner);					
+				}
+			| MINKOWSKI '(' MinkowskiFunctionDefaultOption OptMinkowskiWeights ')'
+				{
+					MinkowskiDistanceStmt *n = makeNode(MinkowskiDistanceStmt);
+					n->norm = $3;
+					n->weights = $4;
+					$$ = (Node *) n;
+				}
+		;
+
+
+OptMinkowskiWeights:
+			',' FeatureFunctionDefaultOption							{	$$ = (Node *) $2; 	}
+			| /* EMPTY */												{	$$ = NULL;			}
+		;
+
+							
+
+OptNormalizationFunction:
+			USING NORMALIZATION OptFeatureFunctionName OptNormalizationParametersList
+				{
+					AdamFunctionOptionsStmt *n= makeNode(AdamFunctionOptionsStmt);
+					n->funtype = SystemTypeName("normalization");
+					n->funname =  $3;
+					n->defaults = $4;
+					$$ = (Node *)n;
+				}
+		  | /* EMPTY */
+				{
+					$$ = NULL;
+				}		
+
+					
+OptAlgorithmFunction:
+			USING ALGORITHM OptFeatureFunctionName OptAlgorithmParametersList
+				{
+					AdamFunctionOptionsStmt *n = makeNode(AdamFunctionOptionsStmt);
+					n->funtype = SystemTypeName("algorithm");
+					n->funname =  $3;
+					n->defaults = $4;
+					$$ = (Node *) n;
+				}
+			| /* EMPTY */
+				{
+					$$ = NULL;
+				}
+
+
+OptDistanceParametersList:
+			',' FeatureFunctionParametersList									{ $$ = $2; }
+			| /* EMPTY */														{ $$ = NIL; }
+	;
+
+OptNormalizationParametersList:
+			'(' FeatureFunctionParametersList ')'								{ $$ = $2; }
+			| /* EMPTY */														{ $$ = NIL; }
+	;
+
+OptAlgorithmParametersList:
+			'(' FeatureFunctionParametersList ')'								{ $$ = $2; }
+			| /* EMPTY */														{ $$ = NIL; }
+	;
+
+
+FeatureFunctionParametersList:
+			FeatureFunctionParameter											{ $$ = list_make1($1); }
+			| FeatureFunctionParametersList ',' FeatureFunctionParameter		{ $$ = lappend($1, $3); }
+		;
+
+FeatureFunctionParameter:
+			  AexprConst
+				{
+					$$ = (Node *) $1;
+				}
+		;
+
+VAIndexStmt:	CREATE VA opt_index_name
+			ON qualified_name '(' index_params ')'
+			OptTableSpace where_clause
+			USING VAIndexMarksStmt
+				{
+					IndexStmt *n = makeNode(IndexStmt);
+
+					Node *marks_relop;
+					
+					n->unique = false;
+					n->concurrent = false;
+					n->idxname = $3;
+					n->relation = $5;
+					n->accessMethod = pstrdup("va");
+					n->indexParams = $7;
+					
+					marks_relop  = (Node *) makeDefElem(pstrdup("vamarks"), (Node *) makeInteger($12));
+
+					n->options = list_make1(marks_relop);
+					n->vamarks = $12;
+					n->tableSpace = $9;
+					n->whereClause = $10;
+					n->excludeOpNames = NIL;
+					n->idxcomment = NULL;
+					n->indexOid = InvalidOid;
+					n->oldNode = InvalidOid;
+					n->primary = false;
+					n->isconstraint = false;
+					n->deferrable = false;
+					n->initdeferred = false;
+					$$ = (Node *)n;
+				}
+		;
+
+VAIndexMarksStmt:
+		    EQUIDISTANT MARKS
+				{
+					$$ = VA_MARKS_EQUIDISTANT;		
+				}
+		|   EQUIFREQUENT MARKS
+				{
+					$$ = VA_MARKS_EQUIFREQUENT;		
+				}	
+			;
+
+PrecomputeNormalizationStmt:
+			PRECOMPUTE NORMALIZATION FOR target_el FROM relation_expr OptPrecomputeDistanceFunction
+				{
+					AdamNormalizationPrecomputeStmt *n = makeNode(AdamNormalizationPrecomputeStmt);
+					n->targetList = list_make1($4);
+					n->relation = $6;
+					n->distance = $7;
+					
+					$$ = (Node *) n;
+				}
+		;
+
+
+					
+OptPrecomputeDistanceFunction:
+			USING DISTANCE OptDistanceFunctionName
+				{
+					AdamFunctionOptionsStmt *n= makeNode(AdamFunctionOptionsStmt);
+					n->funtype = SystemTypeName("d");
+					n->funname =  $3;
+					$$ = (Node *) n;
+				}
+			| /* EMPTY */
+				{
+					$$ = NULL;
+				}
+			;
+
 
 
 /*****************************************************************************
@@ -5130,6 +5491,9 @@ drop_type:	TABLE									{ $$ = OBJECT_TABLE; }
 			| FOREIGN TABLE							{ $$ = OBJECT_FOREIGN_TABLE; }
 			| EVENT TRIGGER 						{ $$ = OBJECT_EVENT_TRIGGER; }
 			| TYPE_P								{ $$ = OBJECT_TYPE; }
+			| ALGORITHM								{ $$ = OBJECT_ALGORITHM; }
+			| DISTANCE								{ $$ = OBJECT_DISTANCE; }
+			| NORMALIZATION							{ $$ = OBJECT_NORMALIZATION; }	
 			| DOMAIN_P								{ $$ = OBJECT_DOMAIN; }
 			| COLLATION								{ $$ = OBJECT_COLLATION; }
 			| CONVERSION_P							{ $$ = OBJECT_CONVERSION; }
@@ -6091,7 +6455,7 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_index_name
 					$$ = (Node *)n;
 				}
 		;
-
+		
 opt_unique:
 			UNIQUE									{ $$ = TRUE; }
 			| /*EMPTY*/								{ $$ = FALSE; }
@@ -8821,12 +9185,13 @@ insert_column_list:
 		;
 
 insert_column_item:
-			ColId opt_indirection
+			ColId opt_indirection OptAlgorithmFunction
 				{
 					$$ = makeNode(ResTarget);
 					$$->name = $1;
 					$$->indirection = check_indirection($2, yyscanner);
 					$$->val = NULL;
+					$$->algorithm = $3;
 					$$->location = @1;
 				}
 		;
@@ -9172,8 +9537,8 @@ select_clause:
  * However, this is not checked by the grammar; parse analysis must check it.
  */
 simple_select:
-			SELECT opt_distinct target_list
-			into_clause from_clause where_clause
+			SELECT opt_distinct target_list 
+			into_clause from_clause where_clause OptDistanceFunction
 			group_clause having_clause window_clause
 				{
 					SelectStmt *n = makeNode(SelectStmt);
@@ -9182,9 +9547,10 @@ simple_select:
 					n->intoClause = $4;
 					n->fromClause = $5;
 					n->whereClause = $6;
-					n->groupClause = $7;
-					n->havingClause = $8;
-					n->windowClause = $9;
+					n->adamStmtClause = $7;
+					n->groupClause = $8;
+					n->havingClause = $9;
+					n->windowClause = $10;
 					$$ = (Node *)n;
 				}
 			| values_clause							{ $$ = $1; }
@@ -9207,19 +9573,47 @@ simple_select:
 					n->fromClause = list_make1($2);
 					$$ = (Node *)n;
 				}
-			| select_clause UNION opt_all select_clause
+			| select_clause UNION OptIntersectUnion opt_all select_clause
 				{
-					$$ = makeSetOp(SETOP_UNION, $3, $1, $4);
+					$$ = makeSetOp(SETOP_UNION, $3, $4, $1, $5);
 				}
-			| select_clause INTERSECT opt_all select_clause
+			| select_clause INTERSECT OptIntersectUnion opt_all select_clause
 				{
-					$$ = makeSetOp(SETOP_INTERSECT, $3, $1, $4);
+					$$ = makeSetOp(SETOP_INTERSECT, $3, $4, $1, $5);
 				}
-			| select_clause EXCEPT opt_all select_clause
+			| select_clause EXCEPT OptExcept opt_all select_clause
 				{
-					$$ = makeSetOp(SETOP_EXCEPT, $3, $1, $4);
+					$$ = makeSetOp(SETOP_EXCEPT, $3, $4, $1, $5);
 				}
 		;
+
+OptIntersectUnion:
+			CRISP			{	$$ =  makeSetOpOptions(SETOP_CRISP); }
+		  | STANDARD		{	$$ = makeSetOpOptions(UNION_INTERSECT_STANDARD); }
+		  | ALGEBRAIC		{	$$ = makeSetOpOptions(UNION_INTERSECT_ALGEBRAIC);	}
+		  | BOUNDED			{	$$ = makeSetOpOptions(UNION_INTERSECT_BOUNDED);	}
+		  | DRASTIC			{	$$ = makeSetOpOptions(UNION_INTERSECT_DRASTIC);	}
+		  | /* EMPTY */		{   $$ = makeSetOpOptions(SETOP_NULL); }
+		  ;
+
+OptExcept:
+			CRISP			{	$$ =  makeSetOpOptions(SETOP_CRISP); }
+		  | STANDARD		{   $$ = makeSetOpOptions(EXCEPT_STANDARD); }
+		  | YAGER '(' AexprConst ')'
+				{	
+					SetOpOptions *n = (SetOpOptions*) makeSetOpOptions(EXCEPT_YAGER);
+					n->options = list_make1($3);
+					$$ = (Node *) n;	
+				}
+		  | SUGENO '(' AexprConst ')'			
+				{	
+					SetOpOptions *n = (SetOpOptions*) makeSetOpOptions(EXCEPT_SUGENO);
+					n->options = list_make1($3);
+					$$ = (Node *) n;
+				}
+		  | /* EMPTY */		{   $$ = makeSetOpOptions(SETOP_NULL); }
+		  ;
+
 
 /*
  * SQL standard WITH clause looks like:
@@ -9366,7 +9760,18 @@ opt_sort_clause:
 		;
 
 sort_clause:
-			ORDER BY sortby_list					{ $$ = $3; }
+			ORDER BY sortby_list					{ $$ = $3; } 
+     	    | ORDER USING DISTANCE								
+				{
+					SortBy *n = makeNode(SortBy);
+					n->node = makeColumnRef(pstrdup("d"), NIL, @1, yyscanner);
+					n->sortby_dir = SORTBY_ASC;
+					n->sortby_nulls = SORTBY_NULLS_DEFAULT;
+					n->useOp = NIL;
+					n->location = @1;
+
+					$$ = list_make1(n);
+				}
 		;
 
 sortby_list:
@@ -10451,7 +10856,6 @@ interval_second:
 				}
 		;
 
-
 /*****************************************************************************
  *
  *	expression grammar
@@ -10529,7 +10933,6 @@ a_expr:		c_expr									{ $$ = $1; }
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, ">", $1, $3, @2); }
 			| a_expr '=' a_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "=", $1, $3, @2); }
-
 			| a_expr qual_Op a_expr				%prec Op
 				{ $$ = (Node *) makeA_Expr(AEXPR_OP, $2, $1, $3, @2); }
 			| qual_Op a_expr					%prec Op
@@ -12469,6 +12872,18 @@ file_name:	Sconst									{ $$ = $1; };
  */
 func_name:	type_function_name
 					{ $$ = list_make1(makeString($1)); }
+			| ALGORITHM type_function_name
+				{
+					$$ = list_make2(makeString("algorithm"), makeString($2));
+				}
+			| DISTANCE type_function_name
+				{
+					$$ = list_make2(makeString("d"), makeString($2));
+				}
+			| NORMALIZATION type_function_name
+				{
+					$$ = list_make2(makeString("normalization"), makeString($2));
+				}
 			| ColId indirection
 					{
 						$$ = check_func_name(lcons(makeString($1), $2),
@@ -12716,6 +13131,8 @@ unreserved_keyword:
 			| ENCODING
 			| ENCRYPTED
 			| ENUM_P
+			| EQUIDISTANT
+			| EQUIFREQUENT
 			| ESCAPE
 			| EVENT
 			| EXCLUDE
@@ -12726,6 +13143,7 @@ unreserved_keyword:
 			| EXTENSION
 			| EXTERNAL
 			| FAMILY
+			| FEATURE_P
 			| FIRST_P
 			| FOLLOWING
 			| FORCE
@@ -12773,6 +13191,7 @@ unreserved_keyword:
 			| MAPPING
 			| MATCH
 			| MATERIALIZED
+			| MAX_P
 			| MAXVALUE
 			| MINUTE_P
 			| MINVALUE
@@ -12803,6 +13222,7 @@ unreserved_keyword:
 			| PASSWORD
 			| PLANS
 			| PRECEDING
+			| PRECOMPUTE
 			| PREPARE
 			| PREPARED
 			| PRESERVE
@@ -12883,6 +13303,7 @@ unreserved_keyword:
 			| UNLOGGED
 			| UNTIL
 			| UPDATE
+			| VA
 			| VACUUM
 			| VALID
 			| VALIDATE
@@ -13006,7 +13427,9 @@ type_func_name_keyword:
  * forced to.
  */
 reserved_keyword:
-			  ALL
+			  ALGEBRAIC
+			| ALGORITHM
+			| ALL
 			| ANALYSE
 			| ANALYZE
 			| AND
@@ -13016,6 +13439,7 @@ reserved_keyword:
 			| ASC
 			| ASYMMETRIC
 			| BOTH
+			| BOUNDED
 			| CASE
 			| CAST
 			| CHECK
@@ -13023,6 +13447,7 @@ reserved_keyword:
 			| COLUMN
 			| CONSTRAINT
 			| CREATE
+			| CRISP
 			| CURRENT_CATALOG
 			| CURRENT_DATE
 			| CURRENT_ROLE
@@ -13032,8 +13457,10 @@ reserved_keyword:
 			| DEFAULT
 			| DEFERRABLE
 			| DESC
+			| DISTANCE
 			| DISTINCT
 			| DO
+			| DRASTIC
 			| ELSE
 			| END_P
 			| EXCEPT
@@ -13054,6 +13481,9 @@ reserved_keyword:
 			| LIMIT
 			| LOCALTIME
 			| LOCALTIMESTAMP
+			| MARKS
+			| MINKOWSKI
+			| NORMALIZATION
 			| NOT
 			| NULL_P
 			| OFFSET
@@ -13068,6 +13498,8 @@ reserved_keyword:
 			| SELECT
 			| SESSION_USER
 			| SOME
+			| STANDARD
+			| SUGENO
 			| SYMMETRIC
 			| TABLE
 			| THEN
@@ -13079,10 +13511,12 @@ reserved_keyword:
 			| USER
 			| USING
 			| VARIADIC
+			| WEIGHTED
 			| WHEN
 			| WHERE
 			| WINDOW
 			| WITH
+			| YAGER
 		;
 
 %%
@@ -13436,14 +13870,24 @@ insertSelectOptions(SelectStmt *stmt,
 }
 
 static Node *
-makeSetOp(SetOperation op, bool all, Node *larg, Node *rarg)
+makeSetOp(SetOperation op, Node * opOptions, bool all, Node *larg, Node *rarg)
 {
 	SelectStmt *n = makeNode(SelectStmt);
 
 	n->op = op;
+	n->opOptions = opOptions;
 	n->all = all;
 	n->larg = (SelectStmt *) larg;
 	n->rarg = (SelectStmt *) rarg;
+	return (Node *) n;
+}
+
+static Node *
+makeSetOpOptions(SetOpOptionsType type)
+{
+	SetOpOptions *n = makeNode(SetOpOptions);
+	n->opType = type;
+
 	return (Node *) n;
 }
 

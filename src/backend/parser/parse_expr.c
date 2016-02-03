@@ -69,11 +69,11 @@ static Node *transformIndirection(ParseState *pstate, Node *basenode,
 static Node *transformTypeCast(ParseState *pstate, TypeCast *tc);
 static Node *transformCollateClause(ParseState *pstate, CollateClause *c);
 static Node *make_row_comparison_op(ParseState *pstate, List *opname,
-					   List *largs, List *rargs, int location);
+					   List *largs, List *rargs, List *mods, int location);
 static Node *make_row_distinct_op(ParseState *pstate, List *opname,
-					 RowExpr *lrow, RowExpr *rrow, int location);
+					 RowExpr *lrow, RowExpr *rrow, List *mods, int location);
 static Expr *make_distinct_op(ParseState *pstate, List *opname,
-				 Node *ltree, Node *rtree, int location);
+				 Node *ltree, Node *rtree, List *mods, int location);
 
 
 /*
@@ -899,6 +899,7 @@ transformAExprOp(ParseState *pstate, A_Expr *a)
 										a->name,
 										((RowExpr *) lexpr)->args,
 										((RowExpr *) rexpr)->args,
+										a->mods,
 										a->location);
 	}
 	else
@@ -911,6 +912,7 @@ transformAExprOp(ParseState *pstate, A_Expr *a)
 								  a->name,
 								  lexpr,
 								  rexpr,
+								  a->mods,
 								  a->location);
 	}
 
@@ -998,6 +1000,7 @@ transformAExprDistinct(ParseState *pstate, A_Expr *a)
 		return make_row_distinct_op(pstate, a->name,
 									(RowExpr *) lexpr,
 									(RowExpr *) rexpr,
+									a->mods,
 									a->location);
 	}
 	else
@@ -1007,6 +1010,7 @@ transformAExprDistinct(ParseState *pstate, A_Expr *a)
 										 a->name,
 										 lexpr,
 										 rexpr,
+										 a->mods,
 										 a->location);
 	}
 }
@@ -1022,6 +1026,7 @@ transformAExprNullIf(ParseState *pstate, A_Expr *a)
 								a->name,
 								lexpr,
 								rexpr,
+								a->mods,
 								a->location);
 
 	/*
@@ -1211,7 +1216,7 @@ transformAExprIn(ParseState *pstate, A_Expr *a)
 			cmp = make_row_comparison_op(pstate,
 										 a->name,
 							  (List *) copyObject(((RowExpr *) lexpr)->args),
-										 ((RowExpr *) rexpr)->args,
+										 ((RowExpr *) rexpr)->args, a->mods,
 										 a->location);
 		}
 		else
@@ -1221,6 +1226,7 @@ transformAExprIn(ParseState *pstate, A_Expr *a)
 								   a->name,
 								   copyObject(lexpr),
 								   rexpr,
+								   a->mods,
 								   a->location);
 		}
 
@@ -1608,6 +1614,7 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 												   sublink->operName,
 												   left_list,
 												   right_list,
+												   NIL,
 												   sublink->location);
 	}
 
@@ -2282,7 +2289,7 @@ transformCollateClause(ParseState *pstate, CollateClause *c)
  */
 static Node *
 make_row_comparison_op(ParseState *pstate, List *opname,
-					   List *largs, List *rargs, int location)
+					   List *largs, List *rargs, List *mods, int location)
 {
 	RowCompareExpr *rcexpr;
 	RowCompareType rctype;
@@ -2324,7 +2331,7 @@ make_row_comparison_op(ParseState *pstate, List *opname,
 		Node	   *rarg = (Node *) lfirst(r);
 		OpExpr	   *cmp;
 
-		cmp = (OpExpr *) make_op(pstate, opname, larg, rarg, location);
+		cmp = (OpExpr *) make_op(pstate, opname, larg, rarg, mods, location);
 		Assert(IsA(cmp, OpExpr));
 
 		/*
@@ -2488,7 +2495,7 @@ make_row_comparison_op(ParseState *pstate, List *opname,
  */
 static Node *
 make_row_distinct_op(ParseState *pstate, List *opname,
-					 RowExpr *lrow, RowExpr *rrow,
+					 RowExpr *lrow, RowExpr *rrow, List *mods,
 					 int location)
 {
 	Node	   *result = NULL;
@@ -2509,7 +2516,7 @@ make_row_distinct_op(ParseState *pstate, List *opname,
 		Node	   *rarg = (Node *) lfirst(r);
 		Node	   *cmp;
 
-		cmp = (Node *) make_distinct_op(pstate, opname, larg, rarg, location);
+		cmp = (Node *) make_distinct_op(pstate, opname, larg, rarg, mods, location);
 		if (result == NULL)
 			result = cmp;
 		else
@@ -2532,11 +2539,11 @@ make_row_distinct_op(ParseState *pstate, List *opname,
  */
 static Expr *
 make_distinct_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
-				 int location)
+				 List *mods, int location)
 {
 	Expr	   *result;
 
-	result = make_op(pstate, opname, ltree, rtree, location);
+	result = make_op(pstate, opname, ltree, rtree, mods, location);
 	if (((OpExpr *) result)->opresulttype != BOOLOID)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),

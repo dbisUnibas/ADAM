@@ -45,4 +45,7 @@ extern List *transformDistinctOnClause(ParseState *pstate, List *distinctlist,
 extern Index assignSortGroupRef(TargetEntry *tle, List *tlist);
 extern bool targetIsInSortList(TargetEntry *tle, Oid sortop, List *sortList);
 
+extern void adjustAdamDistanceClause(ParseState *pstate, Node *adamStmtClause, List **targetList, Node **adamQueryClause);
+extern void adjustAdamWhereClause(ParseState *pstate, Node *adamStmtClause, Node **whereClause, Node **adamQueryClause);
+extern void adjustAdamSortClause(ParseState *pstate, Node *clause, List *targetList, List **sortClause, Node **adamQueryClause);
 #endif   /* PARSE_CLAUSE_H */

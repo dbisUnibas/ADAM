@@ -30,6 +30,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "catalog/adam_data_featurefunction.h"
+
 #include "access/htup_details.h"
 #include "access/multixact.h"
 #include "access/reloptions.h"
@@ -95,6 +97,9 @@ static const FormData_pg_attribute Desc_pg_database[Natts_pg_database] = {Schema
 static const FormData_pg_attribute Desc_pg_authid[Natts_pg_authid] = {Schema_pg_authid};
 static const FormData_pg_attribute Desc_pg_auth_members[Natts_pg_auth_members] = {Schema_pg_auth_members};
 static const FormData_pg_attribute Desc_pg_index[Natts_pg_index] = {Schema_pg_index};
+
+// ADAM DEFINITIONS
+static const FormData_pg_attribute Desc_adam_featurefun[Natts_adam_featurefun] = {Schema_adam_featurefun};
 
 /*
  *		Hash tables that index the relation cache
@@ -2978,8 +2983,10 @@ RelationCacheInitializePhase3(void)
 				  true, Natts_pg_proc, Desc_pg_proc);
 		formrdesc("pg_type", TypeRelation_Rowtype_Id, false,
 				  true, Natts_pg_type, Desc_pg_type);
+		formrdesc("adam_featurefun", AdamFeatureFunRelation_Rowtype_Id, false,
+				  true, Natts_adam_featurefun, Desc_adam_featurefun);
 
-#define NUM_CRITICAL_LOCAL_RELS 4		/* fix if you change list above */
+#define NUM_CRITICAL_LOCAL_RELS 5		/* fix if you change list above */
 	}
 
 	MemoryContextSwitchTo(oldcxt);
@@ -3770,6 +3777,53 @@ RelationGetIndexPredicate(Relation relation)
 	MemoryContextSwitchTo(oldcxt);
 
 	return result;
+}
+
+
+/*
+* returns the marks field stored with the index; in case it is null a second try to re-read the index is done
+* which, however, might fail, too; thus this function might just return NULL
+*/
+ArrayType*
+RelationGetMarks(Relation relation)
+{
+	ArrayType  *result;
+	Datum		marks;
+	bool		isnull;
+	MemoryContext oldcxt;
+
+	/* Quick exit if we already computed the result. */
+	if (relation->rd_marks)
+		return (ArrayType *) relation->rd_marks;
+
+	/* Quick exit if there is nothing to do. */
+	if (relation->rd_indextuple == NULL ||
+		heap_attisnull(relation->rd_indextuple, Anum_pg_index_marks)){
+			//first try
+			RelationReloadIndexInfo(relation);
+
+			if (relation->rd_indextuple == NULL ||
+				heap_attisnull(relation->rd_indextuple, Anum_pg_index_marks)){
+					//second try
+					return NULL;
+			}
+
+	}
+
+	
+	marks = heap_getattr(	 relation->rd_indextuple,
+							 Anum_pg_index_marks,
+							 GetPgIndexDescriptor(),
+							 &isnull);
+	result = DatumGetArrayTypeP(marks);
+	Assert(!isnull);
+
+	oldcxt = MemoryContextSwitchTo(relation->rd_indexcxt);
+	relation->rd_marks = palloc(ARR_SIZE(result));
+	memcpy(relation->rd_marks, result, ARR_SIZE(result));
+	MemoryContextSwitchTo(oldcxt);
+
+	return (ArrayType *)relation->rd_marks;
 }
 
 /*

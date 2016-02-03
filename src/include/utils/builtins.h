@@ -993,6 +993,16 @@ extern Datum int4_avg_accum(PG_FUNCTION_ARGS);
 extern Datum int8_avg(PG_FUNCTION_ARGS);
 extern Datum width_bucket_numeric(PG_FUNCTION_ARGS);
 extern Datum hash_numeric(PG_FUNCTION_ARGS);
+extern Datum numeric_sugeno(PG_FUNCTION_ARGS);
+extern Datum numeric_yager(PG_FUNCTION_ARGS);
+
+/* adam_data_feature / adam_data_physical */
+extern Datum feature_in(PG_FUNCTION_ARGS);
+extern Datum feature_out(PG_FUNCTION_ARGS);
+
+
+/* adam_retrieval_minkowski */
+extern Datum calculate_minkowksi(PG_FUNCTION_ARGS);
 
 /* ri_triggers.c */
 extern Datum RI_FKey_check_ins(PG_FUNCTION_ARGS);

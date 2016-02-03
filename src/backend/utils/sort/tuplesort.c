@@ -1428,7 +1428,7 @@ tuplesort_gettuple_common(Tuplesortstate *state, bool forward,
 				 * originally asked for in a bounded sort.	This is because
 				 * returning EOF here might be the wrong thing.
 				 */
-				if (state->bounded && state->current >= state->bound)
+				if (state->bounded && state->current > state->bound)
 					elog(ERROR, "retrieved too many tuples in a bounded sort");
 
 				return false;

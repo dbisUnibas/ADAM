@@ -30,7 +30,7 @@ extern Expr *transformAssignedExpr(ParseState *pstate, Expr *expr,
 					  char *colname,
 					  int attrno,
 					  List *indirection,
-					  int location);
+					  int location, Node *algorithm);
 extern void updateTargetListEntry(ParseState *pstate, TargetEntry *tle,
 					  char *colname, int attrno,
 					  List *indirection,

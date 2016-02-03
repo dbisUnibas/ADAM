@@ -147,6 +147,8 @@ DESCR("");
 DATA(insert OID = 1259 (  pg_class		PGNSP 83 0 PGUID 0 0 0 0 0 0 0 0 f f p r 29 0 t f f f f t 3 1 _null_ _null_ ));
 DESCR("");
 
+DATA(insert OID = 4318 ( adam_featurefun	PGNSP 4711 0 PGUID 0 0 0 0 0 0 0 0 f f p r 5 0 t f f f f t 3 1 _null_ _null_ ));
+DESCR("");
 
 #define		  RELKIND_RELATION		  'r'		/* ordinary table */
 #define		  RELKIND_INDEX			  'i'		/* secondary index */

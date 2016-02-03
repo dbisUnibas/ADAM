@@ -1119,3 +1119,26 @@ fail:
 	*newcursorpos = newcp;
 	return false;
 }
+
+Oid
+	getReturnTypeOfProcOid(Oid procid){
+		Relation			pgprocrel;
+		HeapTuple			proctup;
+		Form_pg_proc	    procres;
+
+		Oid					result = InvalidOid;
+		
+		pgprocrel = heap_open(ProcedureRelationId, AccessShareLock);
+		proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(procid));
+
+		if(HeapTupleIsValid(proctup)){
+			procres = (Form_pg_proc) GETSTRUCT(proctup);
+			result = procres->prorettype;
+			
+			ReleaseSysCache(proctup);
+		}
+
+		heap_close(pgprocrel, AccessShareLock);
+
+		return result;
+}

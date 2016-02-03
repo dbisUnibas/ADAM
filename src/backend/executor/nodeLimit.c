@@ -318,6 +318,10 @@ recompute_limits(LimitState *node)
 static void
 pass_down_bound(LimitState *node, PlanState *child_node)
 {
+ 	if(!node || !child_node){
+		return;
+	}
+
 	if (IsA(child_node, SortState))
 	{
 		SortState  *sortState = (SortState *) child_node;
@@ -334,6 +338,8 @@ pass_down_bound(LimitState *node, PlanState *child_node)
 			sortState->bounded = true;
 			sortState->bound = tuples_needed;
 		}
+
+		pass_down_bound(node, outerPlanState(child_node));
 	}
 	else if (IsA(child_node, MergeAppendState))
 	{
@@ -359,6 +365,53 @@ pass_down_bound(LimitState *node, PlanState *child_node)
 		if (outerPlanState(child_node) &&
 			!expression_returns_set((Node *) child_node->plan->targetlist))
 			pass_down_bound(node, outerPlanState(child_node));
+	} else if (IsA(child_node, BitmapHeapScanState))
+	{
+		/* pass down to single child */
+		pass_down_bound(node, outerPlanState(child_node));
+	} else if (IsA(child_node, BitmapOrState))
+	{
+		BitmapOrState *borState = (BitmapOrState *) child_node;
+		
+		int i = 0;
+
+		borState->limit = node->count;
+		
+		/* pass down to all children */
+		for (i = 0; i < borState->nplans; i++){
+			PlanState  *subnode = borState->bitmapplans[i];
+			pass_down_bound(node, subnode);
+		}
+	} else if (IsA(child_node, BitmapAndState))
+	{
+		BitmapAndState *banState = (BitmapAndState *) child_node;
+		
+		int i = 0;
+
+		banState->limit = node->count;
+		
+		/* pass down to all children */
+		for (i = 0; i < banState->nplans; i++){
+			PlanState  *subnode = banState->bitmapplans[i];
+			pass_down_bound(node, subnode);
+		}
+	} else if (IsA(child_node, BitmapIndexScanState))
+	{
+		BitmapIndexScanState *bisState = (BitmapIndexScanState *) child_node;
+		
+		if(bisState->adamScanClause){
+			((AdamScanClause *) bisState->adamScanClause)->nn_limit = node->count;
+		}
+	} else if (IsA(child_node, AppendState)) {
+		AppendState * aState = (AppendState *) child_node;
+		pass_down_bound(node, *(aState->appendplans));
+		
+	} else if (IsA(child_node, SubqueryScanState)) {
+		SubqueryScanState *sState = (SubqueryScanState *) child_node;
+		pass_down_bound(node, sState->subplan);
+	} else {
+		pass_down_bound(node, outerPlanState(child_node));
+		pass_down_bound(node, innerPlanState(child_node));
 	}
 }
 

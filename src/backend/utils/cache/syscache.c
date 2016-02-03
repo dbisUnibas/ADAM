@@ -20,6 +20,7 @@
  */
 #include "postgres.h"
 
+#include "catalog/adam_data_featurefunction.h"
 #include "access/htup_details.h"
 #include "access/sysattr.h"
 #include "catalog/indexing.h"
@@ -403,6 +404,28 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		8
+	},
+	{AdamFeatureFunRelationId,				/* FEATUREFUNOID */
+		AdamFeaturefunOidIndexId,
+		1,
+		{
+			ObjectIdAttributeNumber,
+			0,
+			0,
+			0
+		},
+		8
+	},
+	{AdamFeatureFunRelationId,				/* FEATUREFUNTYPENAME */
+		AdamFeaturefuntypeNameIndexId,
+		3,
+		{
+			Anum_adam_featurefun_fname,
+			Anum_adam_featurefun_ftype,
+			Anum_adam_featurefun_fnamespace,
+			0
+		},
+		128
 	},
 	{ForeignDataWrapperRelationId,		/* FOREIGNDATAWRAPPERNAME */
 		ForeignDataWrapperNameIndexId,

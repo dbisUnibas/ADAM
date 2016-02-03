@@ -31,6 +31,8 @@
 #include "executor/execdebug.h"
 #include "executor/nodeBitmapOr.h"
 #include "miscadmin.h"
+#include "miscadmin.h"
+#include "utils/rel.h"
 
 
 /* ----------------------------------------------------------------
@@ -111,6 +113,25 @@ MultiExecBitmapOr(BitmapOrState *node)
 	bitmapplans = node->bitmapplans;
 	nplans = node->nplans;
 
+	/* Scan subplans and change order if ADAM plan is not at the end */
+	/* nb: there should be at maximum 1 ADAM plan (since only 1 distance calculation is allowed - right?)*/
+	for (i = 0; i < nplans; i++){
+		PlanState  *subnode = bitmapplans[i];
+
+		if (IsA(subnode, BitmapIndexScanState) && i != nplans - 1)	{
+			BitmapIndexScanState *scanState = ((BitmapIndexScanState *) subnode);
+
+			if(scanState && scanState->biss_RelationDesc && 
+				scanState->biss_RelationDesc->rd_rel->relam == VA_AM_OID){
+					PlanState *tmp = bitmapplans[nplans - 1];
+					bitmapplans[nplans - 1] = bitmapplans[i];
+					bitmapplans[i] = tmp;
+			}
+		}
+	}
+	
+
+
 	/*
 	 * Scan all the subplans and OR their result bitmaps
 	 */
@@ -126,13 +147,46 @@ MultiExecBitmapOr(BitmapOrState *node)
 		 */
 		if (IsA(subnode, BitmapIndexScanState))
 		{
+			BitmapIndexScanState *scanState = ((BitmapIndexScanState *) subnode);
+
 			if (result == NULL) /* first subplan */
 			{
 				/* XXX should we use less than work_mem for this? */
 				result = tbm_create(work_mem * 1024L);
 			}
+			
+			scanState->biss_result = result;
 
-			((BitmapIndexScanState *) subnode)->biss_result = result;
+			/* ADAM */
+			if(scanState && scanState->biss_RelationDesc && 
+				scanState->biss_RelationDesc->rd_rel->relam == VA_AM_OID){
+					/* using a VA index */
+					scanState->adamScanClause = node->ps.plan->adamPlanClause;
+
+					if(scanState->adamScanClause){
+						AdamScanClause *adamScanClause = (AdamScanClause *) scanState->adamScanClause;
+
+						/* 
+						* we have a search with a WHERE clause given (besides the one that we cheat in,
+						* to bring postgres to use our VA index) 
+						*/
+						adamScanClause->check_tid = true;
+
+						/* 
+						* if unfortunately the where clause is not at first, then set the limit to -1, so that
+						* all the results are returned (this is a costly index scanning, but not much worse than going sequential) 
+						* and avoid a check TID, because we return all entries anyways
+						* NB: this should not happen because we changed the order in the code above, but we should keep this code
+						* to really make sure
+						*/
+						if(i != 0){
+							adamScanClause->nn_limit = node->limit;
+						} else {
+							adamScanClause->nn_limit = -1;
+							adamScanClause->check_tid = false;
+						}
+					}
+			}
 
 			subresult = (TIDBitmap *) MultiExecProcNode(subnode);
 

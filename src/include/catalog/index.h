@@ -115,4 +115,6 @@ extern bool ReindexIsProcessingHeap(Oid heapOid);
 extern bool ReindexIsProcessingIndex(Oid indexOid);
 extern Oid	IndexGetRelation(Oid indexId, bool missing_ok);
 
+extern void UpdateIndexAddMarks(Oid index, Datum marks);
+
 #endif   /* INDEX_H */

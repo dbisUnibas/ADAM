@@ -1020,3 +1020,46 @@ tbm_comparator(const void *left, const void *right)
 		return 1;
 	return 0;
 }
+
+
+int 
+	tbm_nentries(TIDBitmap *tbm)
+{
+	return tbm->nentries;
+}
+
+bool 
+	tbm_contains_tuple(TIDBitmap *tbm, const ItemPointer tid)
+{
+	BlockNumber			blk = ItemPointerGetBlockNumber(tid);
+	OffsetNumber		off = ItemPointerGetOffsetNumber(tid);
+
+	PagetableEntry	   *bpage;
+
+	if (tbm->nentries == 0)
+		return false;
+
+	bpage = tbm_find_pageentry(tbm, blk);
+
+	if(bpage == NULL){
+		return false;
+	} else if (bpage->ischunk)	{
+		return true;
+	} else {
+		int wordnum = WORDNUM(off - 1);
+		int	bitnum = BITNUM(off - 1);
+		bitmapword tidword = 0;
+			
+		tidword |= ((bitmapword) 1 << bitnum);
+
+		for (wordnum = 0; wordnum < WORDS_PER_PAGE; wordnum++){
+			bitmapword currword = bpage->words[wordnum];
+
+			if ((currword & tidword) != 0){
+				return true;
+			}
+		}
+	}
+
+	return false;
+}

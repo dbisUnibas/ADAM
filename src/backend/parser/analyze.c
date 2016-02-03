@@ -24,6 +24,9 @@
 
 #include "postgres.h"
 
+#include "utils/adam_retrieval.h"
+#include "utils/adam_retrieval_normalization.h"
+
 #include "access/sysattr.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -40,6 +43,7 @@
 #include "parser/parse_param.h"
 #include "parser/parse_relation.h"
 #include "parser/parse_target.h"
+#include "parser/parse_type.h"
 #include "parser/parsetree.h"
 #include "rewrite/rewriteManip.h"
 #include "utils/rel.h"
@@ -70,6 +74,22 @@ static Query *transformCreateTableAsStmt(ParseState *pstate,
 						   CreateTableAsStmt *stmt);
 static void transformLockingClause(ParseState *pstate, Query *qry,
 					   LockingClause *lc, bool pushedDown);
+
+/* ADAM */
+static SelectStmt * transformOpTreeForFuzzy(ParseState *pstate, SelectStmt *parseTree, int depthLevel);
+static Node *transformFuzzyAddNode(ParseState *pstate, SelectStmt *stmt, int depthLevel);
+
+static Node *createRandomAlias();
+static bool isStmtFuzzy(SelectStmt *stmt);
+static void makeStmtFuzzy(SelectStmt *stmt);
+static void fillTargetListForFuzzyQuery(ParseState *pstate, SelectStmt *stmt, List** targetList);
+
+static void adjustClausesForFuzzyQuery(SelectStmt *stmt, List** targetList, List** groupList);
+static void adjustClausesForExcept(SelectStmt *stmt, List** targetList, List** groupList);
+static void adjustClausesForUnionIntersect(SelectStmt *stmt, List** targetList, List** groupList);
+static void adjustClausesForCrispQueryWithDistance(SelectStmt *stmt, List** targetList, List** groupList);
+
+static List *createGroupListForTargetList(List *targetList);
 
 
 /*
@@ -201,6 +221,11 @@ transformTopLevelStmt(ParseState *pstate, Node *parseTree)
 			stmt->intoClause = NULL;
 
 			parseTree = (Node *) ctas;
+		}
+		if(true){
+			ParseState *cpyPstate = make_parsestate(pstate);
+			parseTree = (Node *) transformOpTreeForFuzzy(cpyPstate, (SelectStmt *) parseTree, 0);
+			free_parsestate(cpyPstate);
 		}
 	}
 
@@ -829,7 +854,8 @@ transformInsertRow(ParseState *pstate, List *exprlist,
 									 col->name,
 									 lfirst_int(attnos),
 									 col->indirection,
-									 col->location);
+									 col->location, 
+									 col->algorithm);
 
 		result = lappend(result, expr);
 
@@ -924,6 +950,11 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 
 	/* process the FROM clause */
 	transformFromClause(pstate, stmt->fromClause);
+
+	/* process Adam clause */
+	adjustAdamDistanceClause(pstate, stmt->adamStmtClause, &stmt->targetList, &qry->adamQueryClause);
+	adjustAdamWhereClause(pstate, stmt->adamStmtClause, &stmt->whereClause, &qry->adamQueryClause);
+	adjustAdamSortClause(pstate, stmt->adamStmtClause, stmt->targetList, &stmt->sortClause, &qry->adamQueryClause);
 
 	/* transform targetlist */
 	qry->targetList = transformTargetList(pstate, stmt->targetList,
@@ -2499,3 +2530,571 @@ applyLockingClause(Query *qry, Index rtindex,
 	rc->pushedDown = pushedDown;
 	qry->rowMarks = lappend(qry->rowMarks, rc);
 }
+	
+/*
+* transforms an operator tree for fuzzy statements by transforming it recursively
+* and adding fuzzy nodes into the parse tree
+*/
+static SelectStmt *
+	transformOpTreeForFuzzy(ParseState *pstate, SelectStmt *parseTreeNode, int depthLevel)
+{
+	SelectStmt *superStmt = parseTreeNode;
+
+	// check that we are still well in the tree
+	check_stack_depth();
+
+	if(parseTreeNode){
+		SelectStmt *stmt = (SelectStmt *) parseTreeNode;
+		
+		if(stmt && (stmt->op == SETOP_UNION || stmt->op == SETOP_INTERSECT || stmt->op == SETOP_EXCEPT )){
+			//transform only if operation is set to union, intersect and except and if 
+			//the left and the right stmt-tree are not null (should not happend by the grammar)
+			if(stmt->larg && stmt->rarg){
+				//transform bottom up! this is important, especially for filling up the target lists, etc.
+				stmt->larg = transformOpTreeForFuzzy(pstate, stmt->larg, depthLevel + 1);
+				stmt->rarg = transformOpTreeForFuzzy(pstate, stmt->rarg, depthLevel + 1);
+
+				superStmt = (SelectStmt *) transformFuzzyAddNode(pstate, stmt, depthLevel);
+			}
+		}
+
+		if(stmt && stmt->adamStmtClause){
+			makeStmtFuzzy(stmt);
+		}
+	}
+
+	return superStmt;
+}
+
+/*
+* create alias for from clause, this is necessary by the SQL standard
+* (see transformFuzzyAddNode)
+*/
+static Node 
+	*createRandomAlias()
+{
+	char *name = palloc(135);
+	Alias *alias = makeNode(Alias);
+	
+	snprintf(name, 135, "query%ld", pg_lrand48());
+	
+	alias->aliasname = pstrdup(name);
+	return (Node *) alias;
+}
+
+/*
+* add a node for the fuzzy query in the parse tree
+* the idea behind this is the following:
+*
+* assume a SQL statement
+* SELECT * FROM tbl USING DISTANCE
+* UNION
+* SELECT * FROM tbl USING DISTANCE
+*
+*
+* this statement is transformed to the following one
+*
+* SELECT AGG_FUNCTION(distance), field1, field2, field3, etc.
+* FROM
+*    (SELECT * FROM tbl USING DISTANCE
+*     UNION ALL
+*     SELECT * FROM tbl USING DISTANCE) as fzyqry%i%i%ld
+* GROUP BY field1, field2, field3, etc.
+*
+* 
+* i.e. we put a group by function around it;
+*
+* note the following points:
+*   i) the opreation is always changed to UNION ALL if distances are involved,
+*     >in the case of UNION this is necessary not to make 1 tuple 
+*      if two tuples have the same distance and the same other parameters
+*      (since the distance should be handled by the group by function and not the UNION clause)
+*     >in all the other cases the true operation we have is a UNION, but which mirrors the given operation
+*      e.g. an intersection in the distance field
+*     >of course this is not done in the case of a CRISP UNION
+*
+*  ii) if only one of the two arguments (left/right) is fuzzy, the other one is made fuzzy artificially
+*      by assuming maximum distance
+*
+* iii) the target list is already interpreted, * are replaced by the correct fields in the target list
+*      of the super statement, etc. this is necessary since group clauses cannot handle * or indirections
+*      it is important to note that we want here a copy of pstate! everything else would be fatal, 
+*      since we have to work on the tree and transform the target list already; not having a copy
+*      would result in "duplicate field" error messages
+*
+*/
+static Node*
+	transformFuzzyAddNode(ParseState *pstate, SelectStmt *stmt, int depthLevel)
+{
+	SelectStmt * superStmt = makeNode(SelectStmt);
+				
+	List *targetList = NIL;
+	List *groupClause = NIL;
+
+	bool is_larg_fuzzy = isStmtFuzzy(stmt->larg);
+	bool is_rarg_fuzzy = isStmtFuzzy(stmt->rarg);
+
+	RangeSubselect *subSelect = makeNode(RangeSubselect);
+
+	//if both fields are not fuzzy then return 
+	//(we could check here what kind of UNION we have and give error messages
+	//, but for the moment it is fine like that)
+	if(!is_larg_fuzzy && !is_rarg_fuzzy){
+		return (Node*) stmt;
+	}
+
+	//create sub select (to add in from clause)
+	subSelect->lateral = false;
+	subSelect->alias = (Alias *) createRandomAlias(); 
+	subSelect->subquery = (Node *) stmt;
+
+	//fill target list of fuzzy query
+	fillTargetListForFuzzyQuery(pstate, stmt, &targetList);
+
+	//adjust target and group clauses
+	adjustClausesForFuzzyQuery(stmt, &targetList, &groupClause);
+
+
+	//clean names on uppest level
+	if(depthLevel == 0){
+		ListCell *cell;
+
+		foreach(cell, targetList){
+			ResTarget *res = (ResTarget *) lfirst(cell);
+
+			if(res->cleanName){
+				res->name = res->cleanName;
+			}
+		}
+	}
+
+	//set in super stmt
+	superStmt->fromClause = list_make1(subSelect);
+	superStmt->targetList = targetList;
+	superStmt->groupClause = groupClause;
+	superStmt->op = SETOP_NONE;
+
+	//we ignore limit on left arg, and pull-up the limit on right arg
+	//changed: we set the limit always to right arg - does this make sense?
+	//difficult to say, for sure we make the results more extreme!
+	superStmt->limitCount = stmt->rarg->limitCount;
+	stmt->rarg->limitCount = stmt->rarg->limitCount;
+	stmt->larg->limitCount = stmt->rarg->limitCount;
+
+	//we ignore sorting on left arg, and pull-up the sorting on right arg
+	superStmt->sortClause = stmt->rarg->sortClause;
+	stmt->larg->sortClause = NIL;
+	stmt->rarg->sortClause = NIL;
+
+	return (Node *) superStmt;
+}
+
+/*
+* check if a statement is fuzzy
+* this can be because of two reasons:
+* a) it is a leaf statement and has an adam clause
+* b) it is a higher statement and has "distance" in its target list
+*    (because of such a test (we have no other possibilities), 
+*    it is necessary that the target lists are always
+*    filled - at this stage already - from bottom-up)
+*/
+static bool
+	isStmtFuzzy(SelectStmt *stmt){
+
+	if(stmt->adamStmtClause){
+		return true;
+	} else if(stmt->targetList){ 
+		//this is actually an else, because the targetlist should not be empty
+		ResTarget *res = (ResTarget *) linitial(stmt->targetList);
+		
+		//admittedly, such a test is not very nice, another comparison would be nicer
+		//but for the moment it is ok; and furthermore this happends in the analysis only
+		//a few times, so it's fine O(1)
+		if(res->isFuzzy){
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+* makes a statement fuzzy (if it is not yet) by adding a 1.0 column to the very left
+* called distance
+*/
+static void
+	makeStmtFuzzy(SelectStmt *stmt){
+		ResTarget *distTarget = makeNode(ResTarget);
+		distTarget->name = getDistanceFieldName();
+		distTarget->indirection = NIL;
+		distTarget->isFuzzy = true;
+
+		if(!stmt->targetList){
+			stmt->targetList = NIL;	
+		}
+
+		if(stmt && stmt->adamStmtClause){
+			ListCell *cell;
+
+			foreach(cell, stmt->targetList){
+				ResTarget *res = (ResTarget *) lfirst(cell);
+
+				if(res->isFuzzy){
+					return;
+				}
+			}
+		
+			distTarget->val = NULL; //we initiate this with NULL
+			stmt->targetList = lcons(distTarget, stmt->targetList);
+		} else {
+			A_Const * c = makeNode(A_Const);
+
+			c->val.type = T_Float;
+			c->val.val.str = pstrdup("1.0");
+			distTarget->val = (Node *) c;
+
+			stmt->targetList = lcons(distTarget, stmt->targetList);
+		}
+}
+
+
+/*
+* the given target list is filled with the entries from the left select statement
+* (this is a valid filling also given in the SQL standard); 
+* 
+* since the statement might contain * or indirections (e.g. subfields, etc.), we have
+* to fully transform the target list of the lower left select statement
+* (and pstate should here be a copy of the original pstate)
+*/
+static void
+	fillTargetListForFuzzyQuery(ParseState *pstate, SelectStmt *stmt, List** targetList)
+{
+	bool is_larg_fuzzy = isStmtFuzzy(stmt->larg);
+	bool is_rarg_fuzzy = isStmtFuzzy(stmt->rarg);
+
+	List *transformedTargetList;
+
+	ListCell *cell;
+
+	bool transformingListNecessary = false;
+
+	if(is_larg_fuzzy && !is_rarg_fuzzy){
+		makeStmtFuzzy(stmt->rarg);
+	} else if (!is_larg_fuzzy && is_rarg_fuzzy){
+		makeStmtFuzzy(stmt->larg);
+	}
+
+	if(!stmt->larg->targetList){
+		stmt->larg->targetList = NIL;
+	}
+	
+	//check if transforming is necessary
+	foreach(cell, stmt->larg->targetList){
+		ResTarget * res = lfirst(cell);
+
+		if(res->val && IsA(res->val, A_Indirection)){
+			transformingListNecessary = true;
+			break;
+		}
+
+		if(!res->name){
+			transformingListNecessary = true;
+			break;
+		}
+
+		if (res->val && IsA(res->val, ColumnRef)){
+			ColumnRef  *cref = (ColumnRef *) res->val;
+
+			if (IsA(llast(cref->fields), A_Star)){
+				transformingListNecessary = true;
+				break;
+			}
+		}
+	}
+
+	if(transformingListNecessary){
+		//fills pstate (this is allowed here, since we are using a copy of pstate!)
+		transformFromClause(pstate, stmt->larg->fromClause);
+		//unfortunately we need a full target list transformation here 
+		//(which is performed later on anyways, unfortunately this is the only way at the moment)
+		transformedTargetList = transformTargetList(pstate, stmt->larg->targetList, EXPR_KIND_SELECT_TARGET);
+	} else {
+		transformedTargetList = stmt->larg->targetList;
+	}
+
+	foreach(cell, transformedTargetList){
+		ResTarget* res = makeNode(ResTarget);
+		ColumnRef *col = makeNode(ColumnRef);
+				
+		char *resName = palloc(135);
+		char *colName;
+		char *cleanName;
+
+		bool isFuzzy = false;
+
+		if(IsA((Node*) lfirst(cell), TargetEntry)){
+			//target entry
+			TargetEntry* entry = (TargetEntry *) lfirst(cell);
+
+			colName = entry->resname;
+			cleanName = colName;
+		} else {
+			//res entry
+			ResTarget* res = (ResTarget *) lfirst(cell);
+
+			colName = res->name;
+			cleanName = res->cleanName;
+			isFuzzy = res->isFuzzy;
+		}
+		
+		col->fields = list_make1(makeString(pstrdup(colName)));
+
+		snprintf(resName, 135, "attribute%ld", pg_lrand48());
+		res->name = pstrdup(resName);
+		res->cleanName = cleanName;
+		res->val = (Node *) col;
+
+		//target list of super node must never have a distance at this point,
+		//we add it in function adjustClausesForFuzzyQuery
+		if(!isFuzzy){
+			*targetList = lappend(*targetList, res);
+		}
+	}
+}
+
+/*
+* returns the function name of the function to apply for the set operation
+* it is important to note that except returns the function name of the complement function
+* and not an aggregation function! the aggregation is done in adjustClausesForFuzzyQuery by
+* using an intersection
+*/
+static Node *
+	getFuncnameForOp(SetOperation op, SetOpOptionsType opOptionsType)
+{
+	char * result = NULL;
+
+	if(op == SETOP_UNION){
+		switch(opOptionsType){
+		case UNION_INTERSECT_ALGEBRAIC:
+			result = pstrdup("algebraic_union");
+			break;
+		case UNION_INTERSECT_BOUNDED:
+			result = pstrdup("bounded_union");
+			break;
+		case UNION_INTERSECT_DRASTIC:
+			result = pstrdup("drastic_union");
+			break;
+		case UNION_INTERSECT_STANDARD:
+			result = pstrdup("standard_union");
+			break;
+		default:
+			result = pstrdup("standard_union");
+			break;
+		}
+	} else if (op == SETOP_INTERSECT){
+		switch(opOptionsType){
+		case UNION_INTERSECT_ALGEBRAIC:
+			result = pstrdup("algebraic_intersect");
+			break;
+		case UNION_INTERSECT_BOUNDED:
+			result = pstrdup("bounded_intersect");
+			break;
+		case UNION_INTERSECT_DRASTIC:
+			result = pstrdup("drastic_intersect");
+			break;
+		case UNION_INTERSECT_STANDARD:
+			result = pstrdup("standard_intersect");
+			break;
+		default:
+			result = pstrdup("standard_intersect");
+			break;
+		}
+	} else if (op == SETOP_EXCEPT) {
+		switch(opOptionsType){
+		case EXCEPT_SUGENO:
+			result = pstrdup("sugeno_except");
+			break;
+		case EXCEPT_YAGER:
+			result = pstrdup("yager_except");
+			break;
+		case EXCEPT_STANDARD:
+			result = pstrdup("standard_except");
+			break;
+		default:
+			result = pstrdup("standard_except");
+			break;
+		}
+	}
+
+	return (Node *) makeString(result);
+}
+
+/*
+* adjusts the target list and the grouping list (and the all statement of select) 
+* given the current select statement, this involves 
+* 
+* - creating a distance column 
+*   (using an aggregation function or not, this depends on whether all option is chosen or not)
+* - adjusting the grouping clause (see createGroupListForTargetList)
+*/
+static void
+	adjustClausesForFuzzyQuery(SelectStmt *stmt, List** targetList, List** groupList)
+{
+	SetOpOptions *opOptions = (SetOpOptions *) stmt->opOptions;
+
+	*groupList = NIL;
+	
+	if(stmt->all){
+		//all option is chosen, thus we add a distance column, but only for displaying purposes
+		//no aggregation or grouping is performed by the super statement, thus we transform
+		//  (SELECT ...) UNION ALL (SELECT...)
+		//to
+		//  SELECT ... FROM ((SELECT ...) UNION ALL (SELECT...))
+		//i.e. the outer select does not do anything at all
+		ColumnRef *col = makeNode(ColumnRef);
+		ResTarget *res = makeNode(ResTarget);
+		
+		col->fields = list_make1(makeString(pstrdup(getDistanceFieldName())));
+		
+		res->name = getDistanceFieldName();
+		res->isFuzzy = true;
+		res->val = (Node *) col;
+
+		*targetList = lcons(res, *targetList);
+
+		return;
+	}
+
+	//in case of crisp operation, distance is ignored and not added to target list,
+	//otherwise we add a distance column to the target list that is actually an
+	//aggregation function (in the case of EXCEPT we use multiple functions)
+	if(opOptions->opType != SETOP_CRISP && (isStmtFuzzy(stmt->larg) || isStmtFuzzy(stmt->rarg))){
+		if(stmt->op == SETOP_EXCEPT){
+			adjustClausesForExcept(stmt, targetList, groupList);
+		} else {
+			adjustClausesForUnionIntersect(stmt, targetList, groupList);
+		}
+
+		stmt->all = TRUE;
+	/*} else if(opOptions->opType == SETOP_CRISP){
+	   bool keepDistance = (strVal(linitial(opOptions->options)) == "t")?true:false;
+
+	   if(keepDistance && (isStmtFuzzy(stmt->larg) || isStmtFuzzy(stmt->rarg)) && !(isStmtFuzzy(stmt->larg) && isStmtFuzzy(stmt->rarg)) ){
+		   adjustClausesForCrispQueryWithDistance(stmt, targetList, groupList);
+	   }*/
+	}
+
+	//now adjust grouping list after target list is filled
+	*groupList = createGroupListForTargetList(*targetList);
+
+	//in fuzzy case it is truly always a UNION operation, but with a different function
+	if(opOptions->opType != SETOP_CRISP && (isStmtFuzzy(stmt->larg) || isStmtFuzzy(stmt->rarg))){
+		stmt->op = SETOP_UNION;
+	}
+}
+
+/*
+* UNION and INTERSECT
+* apply the U/I aggregation function to the distance field, e.g.
+* AGG( ColumnRef("distance") )
+*/
+static void 
+	adjustClausesForUnionIntersect(SelectStmt *stmt, List** targetList, List** groupList)
+{
+	ResTarget *res = makeNode(ResTarget);
+	FuncCall  *fcall = makeNode(FuncCall);
+	ColumnRef *col = makeNode(ColumnRef);
+	SetOpOptions *opOptions = (SetOpOptions *) stmt->opOptions;
+
+	col->fields = list_make1(makeString(pstrdup(getDistanceFieldName())));
+	fcall->funcname = list_make1(getFuncnameForOp(stmt->op, opOptions->opType));
+	fcall->args = list_make1(col);
+			
+	res->val = (Node *) fcall;
+	res->isFuzzy = true;
+	
+	res->name = getDistanceFieldName();
+
+	*targetList = lcons(res, *targetList);
+}
+
+/*
+* for EXCEPT, first take the complement (STANDARD/SUGENO/YAGER) and then apply an INTERSECT, e.g.
+* AGG( ~ColumnRef("distance") )
+*/
+static void 
+	adjustClausesForExcept(SelectStmt *stmt, List** targetList, List** groupList)
+{
+	FuncCall  *fcall = makeNode(FuncCall);
+	ColumnRef *col	 = makeNode(ColumnRef);
+
+	SetOpOptions *opOptions = (SetOpOptions *) stmt->opOptions;
+	ResTarget *res = makeNode(ResTarget);	
+
+	SelectStmt *rstmt = stmt->rarg;
+	List *rstmt_target = rstmt->targetList;
+	
+	col->fields = list_make1(makeString(getDistanceFieldName()));
+
+	//in the current select add the distance using intersect and standard option (maybe let the user choose that)
+	fcall->funcname = list_make1(getFuncnameForOp(SETOP_INTERSECT, UNION_INTERSECT_STANDARD));
+	fcall->args = list_make1(col);
+
+	res->val = (Node *) fcall;
+	res->name = getDistanceFieldName();
+	res->isFuzzy = true;
+
+	//take the complement in the right arg
+	if(rstmt_target && list_length(rstmt_target) > 0){
+		FuncCall  *fcallSub = makeNode(FuncCall);
+		ResTarget *rtarg_first_elem = (ResTarget *) linitial(rstmt_target);
+
+		fcallSub->funcname = list_make1(getFuncnameForOp(stmt->op, opOptions->opType));
+
+		if(rtarg_first_elem && rtarg_first_elem->isFuzzy && rtarg_first_elem->val){
+			fcallSub->args = list_concat(list_make1(rtarg_first_elem->val), opOptions->options);
+			rtarg_first_elem->val = (Node *) fcallSub;
+		} else if(rstmt->adamStmtClause) {
+			fcallSub->args = opOptions->options;
+			((AdamSelectStmt *) rstmt->adamStmtClause)->except = (Node *) fcallSub;
+		}
+	}
+
+	*targetList = lcons(res, *targetList);
+}
+
+/*
+* adjusts the grouping clause to group for all fields except the distance field
+* since the targetList might not already contain the names of the fields,
+* (but for the "distance" field the name is given, since we set it ourselves)
+* we group using number (this is allowed by the SQL standard), i.e.
+* SELECT a, b, c, d FROM tbl GROUP BY 1, 2, 3, 4
+*/
+static List *
+	createGroupListForTargetList(List *targetList)
+{
+	int group_field_number = 0;
+	List *groupList = NIL;
+
+	ListCell *cell;
+
+	foreach(cell, targetList){
+		ResTarget *res = (ResTarget *) lfirst(cell);
+		A_Const * c;
+
+		group_field_number++;
+
+		if(res->isFuzzy){
+			continue;
+		}
+		
+		c = makeNode(A_Const);
+		c->val.type = T_Integer;
+		c->val.val.ival = group_field_number;
+		
+		groupList = lappend(groupList, c);
+	}
+
+	return groupList;
+}
+	

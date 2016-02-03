@@ -1738,6 +1738,25 @@ DATA(insert OID = 3967 (  "#>>"    PGNSP PGUID b f f 114 1009 25 0 0 json_extrac
 DESCR("get value from json as text with path elements");
 
 
+/* ADAM */
+//feature
+DATA(insert OID = 5007 (  "="	   PGNSP PGUID b t t 4817 4817 16 5007 5008 feature_eq eqsel eqjoinsel  ));
+DESCR("=");
+DATA(insert OID = 5017 (  "==="	   PGNSP PGUID b f f 4817 4817 16 5017 0 feature_dummy_eq eqsel eqjoinsel  ));
+DESCR("===");
+DATA(insert OID = 5008 (  "<>"	   PGNSP PGUID b f f 4817 4817 16 5008 5007 feature_neq - - ));
+DESCR("<>");
+DATA(insert OID = 5013 (  "<~>"	   PGNSP PGUID b f f 4817 4817 1700 5013 0 dummyFeatureDistance - - ));
+DESCR("distance between");
+#define FEATURE_DISTANCE 5013
+DATA(insert OID = 5029 (  "<"	   PGNSP PGUID b f f 4817 4817 16 5030 5032 feature_lt scalarltsel scalarltjoinsel ));
+DESCR("less than");
+DATA(insert OID = 5030 (  ">"	   PGNSP PGUID b f f 4817 4817 16 5029 5031 feature_gt scalargtsel scalargtjoinsel ));
+DESCR("greater than");
+DATA(insert OID = 5031 (  "<="	   PGNSP PGUID b f f 4817 4817 16 5032 5030 feature_le scalarltsel scalarltjoinsel ));
+DESCR("less than or equal");
+DATA(insert OID = 5032 (  ">="	   PGNSP PGUID b f f 4817 4817 16 5031 5029 feature_ge scalargtsel scalargtjoinsel ));
+DESCR("greater than or equal");
 
 /*
  * function prototypes

@@ -584,6 +584,12 @@ colNameToVar(ParseState *pstate, char *colname, bool localonly,
 	Node	   *result = NULL;
 	ParseState *orig_pstate = pstate;
 
+	/* ADAM */
+	if(colname && strcmp(colname, "d") == 0){
+		Var * var = makeVar(1, 1, 701, -1, InvalidOid, 0);
+		return (Node *) var;
+	}
+
 	while (pstate != NULL)
 	{
 		ListCell   *l;

@@ -19,6 +19,7 @@
  */
 #include "postgres.h"
 
+#include "catalog/adam_data_featurefunction.h"
 #include "access/htup_details.h"
 #include "access/xact.h"
 #include "catalog/dependency.h"
@@ -196,6 +197,10 @@ static void NamespaceCallback(Datum arg, int cacheid, uint32 hashvalue);
 static bool MatchNamedCall(HeapTuple proctup, int nargs, List *argnames,
 			   int **argnumbers);
 
+// ADAM FUNCTIONS
+static Oid getFeatureFunFunction(List *names, Oid typeoid);
+static FuncCandidateList createListWithFfun(Oid function);
+static FuncCandidateList checkForFeatureFun(List *names);
 /* These don't really need to appear in any header file */
 Datum		pg_table_is_visible(PG_FUNCTION_ARGS);
 Datum		pg_type_is_visible(PG_FUNCTION_ARGS);
@@ -922,6 +927,10 @@ FuncnameGetCandidates(List *names, int nargs, List *argnames,
 	/* check for caller error */
 	Assert(nargs >= 0 || !(expand_variadic | expand_defaults));
 
+	resultList = checkForFeatureFun(names);
+	if(resultList != NULL){
+		return resultList;
+	}
 	/* deconstruct the name list */
 	DeconstructQualifiedName(names, &schemaname, &funcname);
 
@@ -4163,4 +4172,231 @@ pg_is_other_temp_schema(PG_FUNCTION_ARGS)
 	Oid			oid = PG_GETARG_OID(0);
 
 	PG_RETURN_BOOL(isOtherTempNamespace(oid));
+}
+
+
+
+// ADAM FUNCTIONS
+
+/*
+ * given the type of the feature function and a RangeVar with the name
+ * find the oid of the function (not within pg_proc, but within
+ * the adam catalog)
+ */
+Oid
+FeatureFunctionGetIdWithRangeVar(RangeVar *names, Oid featurefuntype)
+{
+	char	   *schemaname;
+	char	   *featureFunName;
+	Oid			namespaceId;
+	Oid			ffoid = InvalidOid;
+	ListCell   *l;
+	
+	schemaname = names->schemaname;
+	featureFunName = names->relname;
+		
+	if (schemaname) {
+		/* use exact schema given */
+		namespaceId = LookupExplicitNamespace(schemaname, false);
+		return GetSysCacheOid3(FEATUREFUNTYPENAME, 
+				CStringGetDatum(featureFunName), 
+				ObjectIdGetDatum(featurefuntype), 
+				ObjectIdGetDatum(namespaceId));
+	}
+	else
+	{
+		/* flag to indicate we need namespace search */
+		namespaceId = InvalidOid;
+		recomputeNamespacePath();
+
+		foreach(l, activeSearchPath)
+		{
+			namespaceId = lfirst_oid(l);
+
+			if (namespaceId == myTempNamespace)
+				continue;		/* do not look in temp namespace */
+
+			ffoid = GetSysCacheOid3(FEATUREFUNTYPENAME, 
+							CStringGetDatum(featureFunName), 
+							ObjectIdGetDatum(featurefuntype), 
+							ObjectIdGetDatum(namespaceId));
+			if (OidIsValid(ffoid))
+				break;
+		}
+
+		return ffoid;
+	}	
+}
+
+/*
+ * given the type of the feature function and a list of names
+ * find the oid of the function (not within pg_proc, but within
+ * the adam catalog)
+ */
+Oid 
+FeatureFunctionGetIdWithNameList(List *names, Oid featurefuntype)
+{
+	char	   *schemaname;
+	char	   *featureFunName;
+	Oid			namespaceId;
+	Oid			ffoid = InvalidOid;
+	ListCell   *l;
+
+	/* deconstruct the name list */
+	DeconstructQualifiedName(names, &schemaname, &featureFunName);
+
+	if (schemaname) {
+		/* use exact schema given */
+		namespaceId = LookupExplicitNamespace(schemaname, false);
+		return GetSysCacheOid3(FEATUREFUNTYPENAME, 
+				CStringGetDatum(featureFunName), 
+				ObjectIdGetDatum(featurefuntype), 
+				ObjectIdGetDatum(namespaceId));
+	}
+	else
+	{
+		/* flag to indicate we need namespace search */
+		namespaceId = InvalidOid;
+		recomputeNamespacePath();
+
+		foreach(l, activeSearchPath)
+		{
+			namespaceId = lfirst_oid(l);
+
+			if (namespaceId == myTempNamespace)
+				continue;		/* do not look in temp namespace */
+
+			ffoid = GetSysCacheOid3(FEATUREFUNTYPENAME, 
+							CStringGetDatum(featureFunName), 
+							ObjectIdGetDatum(featurefuntype), 
+							ObjectIdGetDatum(namespaceId));
+			if (OidIsValid(ffoid))
+				break;
+		}
+
+		return ffoid;
+	}
+}
+
+/*
+ * checks whether in the list of names a hint is given to use a feature function;
+ * for this purpose in the grammar the words algorithm, distance and normalization
+ * have been made reserved keywords, such that they cannot be taken for a schema name;
+ * if a candidate is found a FuncCandidateList is returned 
+ * (see also function FuncnameGetCandidates in this file, into which we basically
+ * break in with the current function)
+ */
+static FuncCandidateList
+checkForFeatureFun(List *names){
+	Oid			algorithmoid;
+	Oid			distanceoid;
+	Oid			normalizationoid;
+
+	FuncCandidateList result;
+
+	char        *type;
+	
+	if(!names && !linitial(names) && !IsA(linitial(names), Value)){
+		return NULL;
+	}
+
+	type = strVal(linitial(names));
+
+	if( type == NULL ||
+		(strcmp(type, pstrdup("algorithm")) != 0 &&
+		strcmp(type, pstrdup("distance")) != 0 && 
+		strcmp(type, pstrdup("normalization")) != 0)){
+		return NULL;
+	}
+
+	algorithmoid = getFeatureFunFunction(names, ALGORITHMOID);
+	distanceoid = getFeatureFunFunction(names, DISTANCEOID);
+	normalizationoid = getFeatureFunFunction(names, NORMALIZATIONOID);
+
+
+	if(OidIsValid(algorithmoid)){
+		result = createListWithFfun(algorithmoid);
+
+		if(result != NULL){
+			list_delete_first(names);
+			return result;
+		}
+	}
+
+	if(OidIsValid(distanceoid)){
+		result = createListWithFfun(distanceoid);
+	
+		if(result != NULL){
+			list_delete_first(names);
+			return result;
+		}
+	}
+
+	if(OidIsValid(normalizationoid)){
+		result = createListWithFfun(normalizationoid);
+	
+		if(result != NULL){
+			list_delete_first(names);
+			return result;
+		}
+	}
+
+	return NULL;
+}
+
+/*
+ * returns the oid feature function for the name given
+ */
+static Oid
+getFeatureFunFunction(List *names, Oid typeoid){
+	char        *type = typeTypeName(typeidType(typeoid));
+	char        *ffuntypename = strVal(linitial(names));
+
+	List		*mod_names;
+
+	if(!OidIsValid(typeoid) || strcmp(type, ffuntypename) != 0 || list_length(names) <= 1){
+		return InvalidOid;
+	}
+	
+	mod_names = list_delete_first(list_copy(names));
+
+	return FeatureFunctionGetIdWithNameList(mod_names, typeoid);
+}
+
+/*
+ * given an oid, this function create a FuncCandidateList
+ */
+static FuncCandidateList
+createListWithFfun(Oid ffun){
+	FuncCandidateList resultList = NULL;
+	HeapTuple fftup; 
+
+	Form_adam_featurefun ffunform;
+
+	HeapTuple			 proctup;
+	Form_pg_proc		 procform;
+
+	
+	fftup = SearchSysCache1(FEATUREFUNOID, ObjectIdGetDatum(ffun));
+
+	if(HeapTupleIsValid(fftup)){
+		ffunform = (Form_adam_featurefun) GETSTRUCT(fftup);
+
+		proctup = SearchSysCache1(PROCOID, ObjectIdGetDatum(ffunform->adamfoid));
+
+		if(HeapTupleIsValid(proctup)){
+			procform = (Form_pg_proc) GETSTRUCT(proctup);
+			ReleaseSysCache(proctup);
+
+			resultList = FuncnameGetCandidates(
+				list_make2(makeString(pstrdup("pg_catalog")), makeString(procform->proname.data)),
+				-1,
+				NIL,
+				false,
+				false);
+		}
+
+		ReleaseSysCache(fftup);
+	}
+	return resultList;
 }

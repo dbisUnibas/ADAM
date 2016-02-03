@@ -14,7 +14,14 @@
  */
 #include "postgres.h"
 
+#include "commands/adam_data_featurefunctioncmds.h"
+#include "catalog/adam_data_featurefunction.h"
+#include "parser/adam_data_parse_featurefunction.h"
+
+#include "access/htup_details.h"
 #include "catalog/pg_type.h"
+#include "catalog/pg_proc.h"
+#include "catalog/pg_proc_fn.h"
 #include "commands/dbcommands.h"
 #include "funcapi.h"
 #include "miscadmin.h"
@@ -29,6 +36,7 @@
 #include "parser/parse_type.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
+#include "utils/syscache.h"
 #include "utils/rel.h"
 #include "utils/typcache.h"
 
@@ -44,7 +52,8 @@ static Node *transformAssignmentIndirection(ParseState *pstate,
 							   Oid targetCollation,
 							   ListCell *indirection,
 							   Node *rhs,
-							   int location);
+							   int location,
+							   Node *algorithm);
 static Node *transformAssignmentSubscripts(ParseState *pstate,
 							  Node *basenode,
 							  const char *targetName,
@@ -55,7 +64,8 @@ static Node *transformAssignmentSubscripts(ParseState *pstate,
 							  bool isSlice,
 							  ListCell *next_indirection,
 							  Node *rhs,
-							  int location);
+							  int location,
+							  Node *algorithm);
 static List *ExpandColumnRefStar(ParseState *pstate, ColumnRef *cref,
 					bool make_target_entry);
 static List *ExpandAllTables(ParseState *pstate, int location);
@@ -66,7 +76,6 @@ static List *ExpandSingleTable(ParseState *pstate, RangeTblEntry *rte,
 static List *ExpandRowReference(ParseState *pstate, Node *expr,
 				   bool make_target_entry);
 static int	FigureColnameInternal(Node *node, char **name);
-
 
 /*
  * transformTargetEntry()
@@ -127,6 +136,10 @@ transformTargetList(ParseState *pstate, List *targetlist,
 	foreach(o_target, targetlist)
 	{
 		ResTarget  *res = (ResTarget *) lfirst(o_target);
+
+		if(res->isFuzzy && !res->val){
+			continue;
+		}
 
 		/*
 		 * Check for "something.*".  Depending on the complexity of the
@@ -377,7 +390,8 @@ transformAssignedExpr(ParseState *pstate,
 					  char *colname,
 					  int attrno,
 					  List *indirection,
-					  int location)
+					  int location,
+					  Node *algorithm)
 {
 	Relation	rd = pstate->p_target_relation;
 	Oid			type_id;		/* type of value provided */
@@ -481,7 +495,8 @@ transformAssignedExpr(ParseState *pstate,
 										   attrcollation,
 										   list_head(indirection),
 										   (Node *) expr,
-										   location);
+										   location, 
+										   algorithm);
 	}
 	else
 	{
@@ -546,7 +561,7 @@ updateTargetListEntry(ParseState *pstate,
 									  colname,
 									  attrno,
 									  indirection,
-									  location);
+									  location, false);
 
 	/*
 	 * Set the resno to identify the target column --- the rewriter and
@@ -600,7 +615,8 @@ transformAssignmentIndirection(ParseState *pstate,
 							   Oid targetCollation,
 							   ListCell *indirection,
 							   Node *rhs,
-							   int location)
+							   int location,
+							   Node *algorithmOp)
 {
 	Node	   *result;
 	List	   *subscripts = NIL;
@@ -665,7 +681,8 @@ transformAssignmentIndirection(ParseState *pstate,
 													 isSlice,
 													 i,
 													 rhs,
-													 location);
+													 location,
+													 algorithmOp);
 			}
 
 			/* No subscripts, so can process field selection here */
@@ -707,7 +724,8 @@ transformAssignmentIndirection(ParseState *pstate,
 												 fieldCollation,
 												 lnext(i),
 												 rhs,
-												 location);
+												 location, 
+												 algorithmOp);
 
 			/* and build a FieldStore node */
 			fstore = makeNode(FieldStore);
@@ -734,7 +752,8 @@ transformAssignmentIndirection(ParseState *pstate,
 											 isSlice,
 											 NULL,
 											 rhs,
-											 location);
+											 location,
+											 algorithmOp);
 	}
 
 	/* base case: just coerce RHS to match target type ID */
@@ -786,7 +805,8 @@ transformAssignmentSubscripts(ParseState *pstate,
 							  bool isSlice,
 							  ListCell *next_indirection,
 							  Node *rhs,
-							  int location)
+							  int location,
+							  Node *algorithm)
 {
 	Node	   *result;
 	Oid			arrayType;
@@ -825,7 +845,8 @@ transformAssignmentSubscripts(ParseState *pstate,
 										 collationNeeded,
 										 next_indirection,
 										 rhs,
-										 location);
+										 location,
+										 algorithm);
 
 	/* process subscripts */
 	result = (Node *) transformArraySubscripts(pstate,

@@ -68,7 +68,8 @@ extern FuncCandidateList func_select_candidate(int nargs,
 extern void make_fn_arguments(ParseState *pstate,
 				  List *fargs,
 				  Oid *actual_arg_types,
-				  Oid *declared_arg_types);
+				  Oid *declared_arg_types,
+				  int32 *typmods);
 
 extern const char *funcname_signature_string(const char *funcname, int nargs,
 						  List *argnames, const Oid *argtypes);

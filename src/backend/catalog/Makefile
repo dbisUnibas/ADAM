@@ -10,7 +10,8 @@ subdir = src/backend/catalog
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
-OBJS = catalog.o dependency.o heap.o index.o indexing.o namespace.o aclchk.o \
+OBJS = adam_data_featurefunction.o \
+       catalog.o dependency.o heap.o index.o indexing.o namespace.o aclchk.o \
        objectaccess.o objectaddress.o pg_aggregate.o pg_collation.o \
        pg_constraint.o pg_conversion.o \
        pg_depend.o pg_enum.o pg_inherits.o pg_largeobject.o pg_namespace.o \
@@ -29,6 +30,7 @@ all: $(BKIFILES) schemapg.h
 
 POSTGRES_BKI_SRCS = $(addprefix $(top_srcdir)/src/include/catalog/,\
 	pg_proc.h pg_type.h pg_attribute.h pg_class.h \
+	adam_data_featurefunction.h \
 	pg_attrdef.h pg_constraint.h pg_inherits.h pg_index.h pg_operator.h \
 	pg_opfamily.h pg_opclass.h pg_am.h pg_amop.h pg_amproc.h \
 	pg_language.h pg_largeobject_metadata.h pg_largeobject.h pg_aggregate.h \

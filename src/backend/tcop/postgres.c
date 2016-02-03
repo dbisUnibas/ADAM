@@ -3186,6 +3186,9 @@ set_plan_disabling_options(const char *arg, GucContext context, GucSource source
 		case 's':				/* seqscan */
 			tmp = "enable_seqscan";
 			break;
+		case 'v':				/* vascan */
+			tmp = "enable_vascan";
+			break;
 		case 'i':				/* indexscan */
 			tmp = "enable_indexscan";
 			break;

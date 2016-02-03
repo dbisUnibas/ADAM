@@ -16,6 +16,9 @@
  */
 #include "postgres.h"
 
+#include "commands/adam_data_featurefunctioncmds.h"
+#include "utils/adam_retrieval_normalization.h"
+
 #include "access/htup_details.h"
 #include "access/reloptions.h"
 #include "access/twophase.h"
@@ -200,6 +203,8 @@ check_xact_readonly(Node *parsetree)
 		case T_CreateConversionStmt:
 		case T_CreatedbStmt:
 		case T_CreateDomainStmt:
+		case T_CreateAdamFunctionStmt:
+		case T_AdamNormalizationPrecomputeStmt:
 		case T_CreateFunctionStmt:
 		case T_CreateRoleStmt:
 		case T_IndexStmt:
@@ -754,6 +759,7 @@ standard_ProcessUtility(Node *parsetree,
 			break;
 
 		case T_ConstraintsSetStmt:
+			RequireTransactionChain(isTopLevel, "SET CONSTRAINTS");
 			AfterTriggerSetState((ConstraintsSetStmt *) parsetree);
 			break;
 
@@ -1234,6 +1240,14 @@ ProcessUtilitySlow(Node *parsetree,
 			case T_CreateFunctionStmt:	/* CREATE FUNCTION */
 				CreateFunction((CreateFunctionStmt *) parsetree, queryString);
 				break;
+				
+			case T_CreateAdamFunctionStmt:
+				defineAdamFeatureFunction((CreateAdamFunctionStmt *) parsetree, queryString);
+				break;
+			
+			case T_AdamNormalizationPrecomputeStmt:
+				adjustAdamNormalizationPrecomputeStmt((AdamNormalizationPrecomputeStmt *) parsetree);
+			break;
 
 			case T_AlterFunctionStmt:	/* ALTER FUNCTION */
 				AlterFunction((AlterFunctionStmt *) parsetree);
@@ -1716,6 +1730,10 @@ CreateCommandTag(Node *parsetree)
 		case T_SelectStmt:
 			tag = "SELECT";
 			break;
+		
+		case T_AdamNormalizationPrecomputeStmt:
+			tag = "PRECOMPUTE";
+			break;
 
 			/* utility statements --- same whether raw or cooked */
 		case T_TransactionStmt:
@@ -2065,6 +2083,10 @@ CreateCommandTag(Node *parsetree)
 
 		case T_CreateFunctionStmt:
 			tag = "CREATE FUNCTION";
+			break;
+
+		case T_CreateAdamFunctionStmt:
+			tag = "CREATE FEATUREFUN";
 			break;
 
 		case T_IndexStmt:
@@ -2619,6 +2641,14 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_ViewStmt:
+			lev = LOGSTMT_DDL;
+			break;
+
+		case T_CreateAdamFunctionStmt:
+			lev = LOGSTMT_DDL;
+			break;
+
+		case T_AdamNormalizationPrecomputeStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

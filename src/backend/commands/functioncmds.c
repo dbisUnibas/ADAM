@@ -78,7 +78,7 @@
  * validator, so as not to produce a NOTICE and then an ERROR for the same
  * condition.)
  */
-static void
+void
 compute_return_type(TypeName *returnType, Oid languageOid,
 					Oid *prorettype_p, bool *returnsSet_p)
 {
@@ -165,7 +165,7 @@ compute_return_type(TypeName *returnType, Oid languageOid,
  * requiredResultType is set to InvalidOid if there are no OUT parameters,
  * else it is set to the OID of the implied result type.
  */
-static void
+void
 examine_parameter_list(List *parameters, Oid languageOid,
 					   const char *queryString,
 					   oidvector **parameterTypes,
@@ -428,7 +428,7 @@ examine_parameter_list(List *parameters, Oid languageOid,
  * raise a duplicate-clause error.	(We don't try to detect duplicate
  * SET parameters though --- if you're redundant, the last one wins.)
  */
-static bool
+bool
 compute_common_attribute(DefElem *defel,
 						 DefElem **volatility_item,
 						 DefElem **strict_item,
@@ -497,7 +497,7 @@ duplicate_error:
 	return false;				/* keep compiler quiet */
 }
 
-static char
+char
 interpret_func_volatility(DefElem *defel)
 {
 	char	   *str = strVal(defel->arg);
@@ -520,7 +520,7 @@ interpret_func_volatility(DefElem *defel)
  *
  * The input and result may be NULL to signify a null entry.
  */
-static ArrayType *
+ArrayType *
 update_proconfig_value(ArrayType *a, List *set_items)
 {
 	ListCell   *l;
@@ -551,7 +551,7 @@ update_proconfig_value(ArrayType *a, List *set_items)
  * Dissect the list of options assembled in gram.y into function
  * attributes.
  */
-static void
+void
 compute_attributes_sql_style(List *options,
 							 List **as,
 							 char **language,
@@ -688,7 +688,7 @@ compute_attributes_sql_style(List *options,
  *	   be assumed to be repeatable over multiple evaluations.
  *------------
  */
-static void
+void
 compute_attributes_with_style(List *parameters, bool *isStrict_p, char *volatility_p)
 {
 	ListCell   *pl;
@@ -723,7 +723,7 @@ compute_attributes_with_style(List *parameters, bool *isStrict_p, char *volatili
  *
  *	   AS <object reference, or sql code>
  */
-static void
+void
 interpret_AS_clause(Oid languageOid, const char *languageName,
 					char *funcname, List *as,
 					char **prosrc_str_p, char **probin_str_p)

@@ -55,6 +55,7 @@ CATALOG(pg_index,2610) BKI_WITHOUT_OIDS BKI_SCHEMA_MACRO
 								 * each zero entry in indkey[] */
 	pg_node_tree indpred;		/* expression tree for predicate, if a partial
 								 * index; else NULL */
+	numeric      marks[1];
 #endif
 } FormData_pg_index;
 
@@ -69,7 +70,7 @@ typedef FormData_pg_index *Form_pg_index;
  *		compiler constants for pg_index
  * ----------------
  */
-#define Natts_pg_index					18
+#define Natts_pg_index					19
 #define Anum_pg_index_indexrelid		1
 #define Anum_pg_index_indrelid			2
 #define Anum_pg_index_indnatts			3
@@ -88,6 +89,7 @@ typedef FormData_pg_index *Form_pg_index;
 #define Anum_pg_index_indoption			16
 #define Anum_pg_index_indexprs			17
 #define Anum_pg_index_indpred			18
+#define Anum_pg_index_marks				19
 
 /*
  * Index AMs that support ordered scans must support these two indoption

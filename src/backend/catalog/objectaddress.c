@@ -15,6 +15,8 @@
 
 #include "postgres.h"
 
+#include "catalog/adam_data_featurefunction.h"
+#include "parser/adam_data_parse_featurefunction.h"
 #include "access/htup_details.h"
 #include "access/sysattr.h"
 #include "catalog/catalog.h"
@@ -171,6 +173,18 @@ static ObjectPropertyType ObjectProperty[] =
 		Anum_pg_extension_extname,
 		InvalidAttrNumber,		/* extension doesn't belong to extnamespace */
 		Anum_pg_extension_extowner,
+		InvalidAttrNumber,
+		ACL_KIND_EXTENSION,
+		true
+	},
+	{
+		AdamFeatureFunRelationId,
+		AdamFeaturefunOidIndexId,
+		FEATUREFUNOID,
+		-1,
+		Anum_adam_featurefun_fname,
+		Anum_adam_featurefun_fnamespace,
+		Anum_adam_featurefun_fowner,
 		InvalidAttrNumber,
 		ACL_KIND_EXTENSION,
 		true
@@ -529,6 +543,24 @@ get_object_address(ObjectType objtype, List *objname, List *objargs,
 				address.classId = ProcedureRelationId;
 				address.objectId =
 					LookupAggNameTypeNames(objname, objargs, missing_ok);
+				address.objectSubId = 0;
+				break;
+			case OBJECT_ALGORITHM:
+				address.classId = AdamFeatureFunRelationId;
+				address.objectId =
+					getAlgorithmOidFromList(objname, missing_ok);
+				address.objectSubId = 0;
+				break;
+			case OBJECT_DISTANCE:
+				address.classId = AdamFeatureFunRelationId;
+				address.objectId =
+					getDistanceOidFromList(objname, missing_ok);
+				address.objectSubId = 0;
+				break;
+			case OBJECT_NORMALIZATION:
+				address.classId = AdamFeatureFunRelationId;
+				address.objectId =
+					getNormalizationOidFromList(objname, missing_ok);
 				address.objectSubId = 0;
 				break;
 			case OBJECT_FUNCTION:
@@ -1147,6 +1179,11 @@ check_object_ownership(Oid roleid, ObjectType objtype, ObjectAddress address,
 		case OBJECT_ATTRIBUTE:
 			if (!pg_type_ownercheck(address.objectId, roleid))
 				aclcheck_error_type(ACLCHECK_NOT_OWNER, address.objectId);
+			break;
+		case OBJECT_ALGORITHM:
+		case OBJECT_DISTANCE:
+		case OBJECT_NORMALIZATION:
+			//maybe add check
 			break;
 		case OBJECT_AGGREGATE:
 		case OBJECT_FUNCTION:

@@ -311,6 +311,11 @@ DECLARE_UNIQUE_INDEX(pg_extension_name_index, 3081, on pg_extension using btree(
 DECLARE_UNIQUE_INDEX(pg_range_rngtypid_index, 3542, on pg_range using btree(rngtypid oid_ops));
 #define RangeTypidIndexId					3542
 
+DECLARE_UNIQUE_INDEX(adam_featurefun_oid_index, 4351, on adam_featurefun using btree(oid oid_ops));
+#define AdamFeaturefunOidIndexId	4351
+DECLARE_UNIQUE_INDEX(adam_featurefun_typeName_index, 4352, on adam_featurefun using btree(adamfname name_ops, adamftype oid_ops, adamfnamespace oid_ops));
+#define AdamFeaturefuntypeNameIndexId	4352
+
 /* last step of initialization script: build the indexes declared above */
 BUILD_INDICES
 
