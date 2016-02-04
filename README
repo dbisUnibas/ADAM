@@ -1,28 +1,16 @@
-PostgreSQL Database Management System
+ADAM
 =====================================
 
-This directory contains the source code distribution of the PostgreSQL
-database management system.
+This directory contains the source code distribution of dbADAM. 
 
-PostgreSQL is an advanced object-relational database management system
-that supports an extended subset of the SQL standard, including
-transactions, foreign keys, subqueries, triggers, user-defined types
-and functions.  This distribution also contains C language bindings.
+dbADAM is based on PostgreSQL and supports nearest neigbour retrieval for feature vector data. In addition, it comes with Vector Approximation-File to make querying more efficient.
 
-PostgreSQL has many language interfaces, many of which are listed here:
+Find more information on dbADAM in the following publications:
 
-	http://www.postgresql.org/download
+- Ivan Giangreco, Ihab Al Kabary, and Heiko Schuldt (2014): ADAM — A Database and Information Retrieval System for Big Multimedia Collections. Proceedings of the 3rd IEEE International Congress on Big Data. Anchorage, USA. 
+http://dx.doi.org/10.1109/BigData.Congress.2014.66
 
-See the file INSTALL for instructions on how to build and install
-PostgreSQL.  That file also lists supported operating systems and
-hardware platforms and contains information regarding any other
-software packages that are required to build or run the PostgreSQL
-system.  Changes between all PostgreSQL releases are recorded in the
-file HISTORY.  Copyright and license information can be found in the
-file COPYRIGHT.  A comprehensive documentation set is included in this
-distribution; it can be read as described in the installation
-instructions.
+- Ivan Giangreco, Ihab Al Kabary, and Heiko Schuldt (2014): ADAM — A System for Jointly Providing IR and Database Queries in Large-Scale Multimedia Retrieval. SIGIR '14: Proceedings of the 37th International ACM SIGIR Conference on Research & Development in Information Retrieval Proceedings. Gold Coast, Australia.
+http://doi.acm.org/10.1145/2600428.2611182
 
-The latest version of this software may be obtained at
-http://www.postgresql.org/download/.  For more information look at our
-web site located at http://www.postgresql.org/.
+ADAM is being developed in the course of the iMotion project (http://imotion-project.eu) at the Databases and Information Systems Research Group (http://dbis.cs.unibas.ch) at the University of Basel, Switzerland.
