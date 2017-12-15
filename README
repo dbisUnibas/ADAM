@@ -13,4 +13,4 @@ http://dx.doi.org/10.1109/BigData.Congress.2014.66
 - Ivan Giangreco, Ihab Al Kabary, and Heiko Schuldt (2014): ADAM — A System for Jointly Providing IR and Database Queries in Large-Scale Multimedia Retrieval. SIGIR '14: Proceedings of the 37th International ACM SIGIR Conference on Research & Development in Information Retrieval Proceedings. Gold Coast, Australia.
 http://doi.acm.org/10.1145/2600428.2611182
 
-ADAM is being developed in the course of the iMotion project (http://imotion-project.eu) at the Databases and Information Systems Research Group (http://dbis.cs.unibas.ch) at the University of Basel, Switzerland.
+ADAM is being developed in the course of the iMotion project (http://imotion-project.eu) at the Databases and Information Systems Research Group (http://dbis.cs.unibas.ch) at the University of Basel, Switzerland. ADAM is no longer in development; the successor ADAMpro can be found at https://github.com/vitrivr/ADAMpro/ 
